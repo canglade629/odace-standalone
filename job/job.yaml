@@ -1,0 +1,50 @@
+resources:
+  jobs:
+    odace_refresh:
+      name: odace_refresh
+      email_notifications:
+        on_start:
+          - hnana.salma@gmail.com
+        on_success:
+          - hnana.salma@gmail.com
+        on_failure:
+          - hnana.salma@gmail.com
+        no_alert_for_skipped_runs: true
+      notification_settings:
+        no_alert_for_skipped_runs: true
+        no_alert_for_canceled_runs: true
+      tasks:
+        - task_key: bronze_logement
+          notebook_task:
+            notebook_path: /Workspace/Users/christophe629@gmail.com/odace/bronze_logement
+            source: WORKSPACE
+          email_notifications:
+            on_success:
+              - christophe629@gmail.com
+            on_failure:
+              - christophe629@gmail.com
+        - task_key: bronze_transport
+          notebook_task:
+            notebook_path: /Workspace/Users/christophe629@gmail.com/odace/bronze_transport
+            source: WORKSPACE
+        - task_key: silver_gares
+          depends_on:
+            - task_key: bronze_transport
+          notebook_task:
+            notebook_path: /Workspace/Users/christophe629@gmail.com/odace/silver_gares
+            source: WORKSPACE
+        - task_key: silver_lignes
+          depends_on:
+            - task_key: bronze_transport
+          notebook_task:
+            notebook_path: /Workspace/Users/christophe629@gmail.com/odace/silver_lignes
+            source: WORKSPACE
+        - task_key: silver_logement
+          depends_on:
+            - task_key: bronze_logement
+          notebook_task:
+            notebook_path: /Workspace/Users/christophe629@gmail.com/odace/silver_logement
+            source: WORKSPACE
+      queue:
+        enabled: true
+      performance_target: PERFORMANCE_OPTIMIZED
