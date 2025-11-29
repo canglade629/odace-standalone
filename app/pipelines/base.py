@@ -176,6 +176,9 @@ class BaseBronzePipeline(BasePipeline):
         # Process each file
         target_path = self.settings.get_bronze_path(self.get_target_table())
         
+        # In force mode, overwrite on first file for idempotency, then append rest
+        is_first_file = True
+        
         for file_path in files_to_process:
             try:
                 logger.info(f"Processing {file_path}")
@@ -186,8 +189,15 @@ class BaseBronzePipeline(BasePipeline):
                 # Transform
                 df = self.transform(df, file_path)
                 
-                # Write to Delta (use configured write mode)
-                write_mode = self.get_write_mode()
+                # Determine write mode for idempotency:
+                # - Force mode: overwrite first file (clears old data), append rest
+                # - Normal mode: use configured mode (default append)
+                if force and is_first_file:
+                    write_mode = "overwrite"
+                    is_first_file = False
+                else:
+                    write_mode = self.get_write_mode()
+                
                 self.delta_ops.write_delta(
                     df,
                     target_path,

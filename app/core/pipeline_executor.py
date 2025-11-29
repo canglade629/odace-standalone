@@ -357,34 +357,33 @@ class PipelineExecutor:
                 silver_pipelines = self.registry.list_pipelines(PipelineLayer.SILVER)
                 
                 for pipeline_info in silver_pipelines:
-                    states = await self.execute_with_dependencies(
+                    # In full pipeline mode, bronze is already run, so don't re-run dependencies
+                    # Just run the silver pipeline directly
+                    state = await self.execute_pipeline(
                         PipelineLayer.SILVER,
                         pipeline_info.name,
                         force=force,
                         job_id=job_id
                     )
-                    results.extend(states)
+                    results.append(state)
                     
-                    # Count only the main pipeline, not dependencies
-                    main_state = states[-1] if states else None
-                    if main_state:
-                        if main_state.status == PipelineStatus.SUCCESS:
-                            completed += 1
-                        elif main_state.status == PipelineStatus.FAILED:
-                            failed += 1
-                            # Fail-fast: Stop execution on first failure
-                            logger.error(f"Task {pipeline_info.name} failed, stopping remaining pipelines")
-                        
-                        # Update job progress
-                        self.job_manager.update_job_progress(
-                            job_id,
-                            completed_tasks=completed,
-                            failed_tasks=failed
-                        )
-                        
-                        # Break on first failure (fail-fast)
-                        if main_state.status == PipelineStatus.FAILED:
-                            break
+                    if state.status == PipelineStatus.SUCCESS:
+                        completed += 1
+                    elif state.status == PipelineStatus.FAILED:
+                        failed += 1
+                        # Fail-fast: Stop execution on first failure
+                        logger.error(f"Task {pipeline_info.name} failed, stopping remaining pipelines")
+                    
+                    # Update job progress
+                    self.job_manager.update_job_progress(
+                        job_id,
+                        completed_tasks=completed,
+                        failed_tasks=failed
+                    )
+                    
+                    # Break on first failure (fail-fast)
+                    if state.status == PipelineStatus.FAILED:
+                        break
             
             # Determine final job status
             # If any task failed, the entire job is considered failed
