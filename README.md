@@ -81,6 +81,220 @@ Content-Type: application/json
 }
 ```
 
+### Running the Full Pipeline - Detailed Guide
+
+The full pipeline endpoint (`/api/pipeline/run`) orchestrates the complete data processing workflow from raw data to cleaned, transformed tables.
+
+#### Basic Full Pipeline Run
+
+**Run the complete pipeline** (Bronze → Silver):
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"force": true}' \
+  https://your-service.run.app/api/pipeline/run
+```
+
+**Expected Response**:
+```json
+{
+  "job_id": "3c8f78d2-671a-4565-806a-b77e614f5868",
+  "status": "success",
+  "total_pipelines": 12,
+  "succeeded": 12,
+  "failed": 0,
+  "pipelines": [
+    {
+      "run_id": "uuid",
+      "pipeline_name": "geo",
+      "layer": "bronze",
+      "status": "success",
+      "started_at": "2025-11-29T12:18:42.731198",
+      "completed_at": "2025-11-29T12:18:49.615840",
+      "duration_seconds": 6.88,
+      "message": "Successfully processed 1 file(s), 34935 rows"
+    },
+    ...
+  ]
+}
+```
+
+#### Pipeline Run Options
+
+**1. Full Pipeline (Recommended)**
+Runs all bronze pipelines first, then all silver pipelines:
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bronze_only": false,
+    "silver_only": false,
+    "force": true
+  }' \
+  https://your-service.run.app/api/pipeline/run
+```
+- **Executes**: 6 bronze + 6 silver = 12 total pipelines
+- **Duration**: ~2-3 minutes
+- **Use when**: Running a complete data refresh
+
+**2. Bronze Layer Only**
+Only ingests raw data into bronze tables:
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bronze_only": true,
+    "force": true
+  }' \
+  https://your-service.run.app/api/pipeline/run
+```
+- **Executes**: 6 bronze pipelines
+- **Duration**: ~1-2 minutes
+- **Use when**: Only new raw files need to be ingested
+
+**3. Silver Layer Only**
+Only transforms bronze data into silver tables:
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "silver_only": true,
+    "force": true
+  }' \
+  https://your-service.run.app/api/pipeline/run
+```
+- **Executes**: 6 silver pipelines
+- **Duration**: ~1 minute
+- **Use when**: Bronze data exists and only transformations need updating
+
+**4. Incremental Run**
+Only processes new files (uses checkpoints):
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "force": false
+  }' \
+  https://your-service.run.app/api/pipeline/run
+```
+- **Executes**: Only pipelines with new data
+- **Duration**: Varies (only processes changes)
+- **Use when**: Running scheduled incremental updates
+
+#### Understanding `force` Parameter
+
+| `force` | Behavior | Checkpoints | Use Case |
+|---------|----------|-------------|----------|
+| `true` | Reprocess ALL files | Cleared | Complete refresh, ensure idempotency |
+| `false` | Process NEW files only | Preserved | Incremental updates, daily runs |
+
+**Idempotency**: With `force=true`, running the pipeline multiple times produces identical results (no data duplication).
+
+#### Monitoring Pipeline Execution
+
+**1. Check job status**:
+```bash
+curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  https://your-service.run.app/api/jobs/{job_id}
+```
+
+**2. List recent jobs**:
+```bash
+curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  https://your-service.run.app/api/jobs?limit=10
+```
+
+**3. View task details**:
+```json
+{
+  "job_id": "uuid",
+  "status": "success",
+  "job_name": "Full Pipeline - Bronze → Silver",
+  "total_tasks": 12,
+  "completed_tasks": 12,
+  "failed_tasks": 0,
+  "started_at": "2025-11-29T12:18:42Z",
+  "completed_at": "2025-11-29T12:21:03Z",
+  "tasks": [
+    {
+      "task_id": "uuid",
+      "pipeline_name": "geo",
+      "layer": "bronze",
+      "status": "success",
+      "duration_seconds": 6.88,
+      "message": "Successfully processed 1 file(s), 34935 rows"
+    },
+    ...
+  ]
+}
+```
+
+#### Expected Results
+
+After a successful full pipeline run, you should have:
+
+**Bronze Tables** (raw ingested data):
+- `bronze.accueillants`: ~1,634 rows
+- `bronze.geo`: ~34,935 rows
+- `bronze.gares`: ~3,884 rows
+- `bronze.lignes`: ~1,069 rows
+- `bronze.logement`: ~279,760 rows
+- `bronze.zones_attraction`: ~34,875 rows
+
+**Silver Tables** (cleaned & transformed):
+- `silver.accueillants`: ~1,634 rows
+- `silver.geo`: ~34,935 rows
+- `silver.gares`: ~2,974 rows (deduplicated)
+- `silver.lignes`: ~933 rows (deduplicated)
+- `silver.logement`: ~34,928 rows (deduplicated)
+- `silver.zones_attraction`: ~28,377 rows
+
+#### Error Handling
+
+**If a pipeline fails**:
+```json
+{
+  "job_id": "uuid",
+  "status": "failed",
+  "total_pipelines": 12,
+  "succeeded": 5,
+  "failed": 1,
+  "pipelines": [
+    ...
+    {
+      "pipeline_name": "logement",
+      "layer": "bronze",
+      "status": "failed",
+      "error": "Error message here"
+    }
+  ]
+}
+```
+
+**Recovery**: Simply re-run with `force=true` to retry:
+```bash
+curl -X POST \
+  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"force": true}' \
+  https://your-service.run.app/api/pipeline/run
+```
+
+The pipeline is **idempotent**, so re-running will clear the error and produce correct results.
+
+#### Best Practices
+
+1. **Use `force=true` for manual runs** - Ensures clean, consistent results
+2. **Use `force=false` for scheduled runs** - Efficient incremental processing
+3. **Monitor job status** - Check `/api/jobs/{job_id}` for detailed progress
+4. **Verify results** - Query data tables after pipeline completion
+5. **Re-run on failures** - Safe to retry with `force=true`
+
 **Check pipeline status**:
 ```bash
 GET /api/pipeline/status/{run_id}
