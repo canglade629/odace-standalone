@@ -59,3 +59,7 @@ data/
 # Checkpoints
 checkpoints/
 
+# API Key Emails (contains sensitive API keys)
+scripts/email_templates/*.html
+!scripts/email_templates/SAMPLE*.html
+

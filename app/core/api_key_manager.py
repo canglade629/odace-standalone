@@ -34,6 +34,7 @@ def hash_api_key(api_key: str) -> str:
 async def create_api_key(user_id: str, db: firestore.AsyncClient) -> Dict[str, Any]:
     """
     Generate a new API key and store it in Firestore.
+    If the user already has an API key, it will be deleted and replaced.
     
     Args:
         user_id: The user identifier (email or user ID)
@@ -44,8 +45,21 @@ async def create_api_key(user_id: str, db: firestore.AsyncClient) -> Dict[str, A
             - api_key: The plaintext API key (SHOW ONLY ONCE)
             - user_id: The user identifier
             - created_at: Timestamp of creation
+            - replaced: Boolean indicating if an existing key was replaced
     """
-    # Generate the API key
+    # Check for existing keys for this user and delete them
+    from google.cloud.firestore_v1.base_query import FieldFilter
+    
+    existing_keys = db.collection("api_keys").where(
+        filter=FieldFilter("user_id", "==", user_id)
+    ).stream()
+    replaced = False
+    
+    async for doc in existing_keys:
+        await doc.reference.delete()
+        replaced = True
+    
+    # Generate the new API key
     api_key = generate_api_key()
     hashed_key = hash_api_key(api_key)
     
@@ -64,7 +78,8 @@ async def create_api_key(user_id: str, db: firestore.AsyncClient) -> Dict[str, A
     return {
         "api_key": api_key,  # Return plaintext only once
         "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.utcnow().isoformat(),
+        "replaced": replaced
     }
 
 

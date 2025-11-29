@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votre clé API ODACE</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    
+    <div style="background-color: #f8f9fa; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
+        <h1 style="color: #2c3e50; margin-top: 0;">Bienvenue sur l'API ODACE</h1>
+        
+        <p>Bonjour,</p>
+        
+        <p>Votre clé API a été créée avec succès. Cette clé vous permettra d'accéder à l'ensemble de nos services API ODACE.</p>
+        
+        <div style="background-color: #fff; border-left: 4px solid #3498db; padding: 20px; margin: 25px 0; border-radius: 4px;">
+            <h2 style="color: #2c3e50; margin-top: 0; font-size: 16px;">Votre clé API :</h2>
+            <code style="background-color: #f8f9fa; padding: 12px; display: block; border-radius: 4px; font-size: 14px; word-wrap: break-word; font-family: 'Courier New', monospace; color: #e74c3c; font-weight: bold;">sk_live_EXAMPLE_KEY_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</code>
+            <p style="margin-bottom: 0; font-size: 12px; color: #7f8c8d; margin-top: 10px;">
+                <strong>⚠️ Important :</strong> Conservez cette clé en lieu sûr. Elle ne sera plus affichée après cet email.
+            </p>
+        </div>
+        
+        <h2 style="color: #2c3e50; font-size: 18px;">Comment utiliser votre clé API</h2>
+        
+        <p>Pour accéder à l'API, incluez votre clé dans l'en-tête <code style="background-color: #f8f9fa; padding: 2px 6px; border-radius: 3px;">Authorization</code> de vos requêtes HTTP :</p>
+        
+        <div style="background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; margin: 15px 0; overflow-x: auto;">
+            <pre style="margin: 0; font-family: 'Courier New', monospace; font-size: 13px;">curl -H "Authorization: Bearer sk_live_EXAMPLE_KEY_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/endpoint</pre>
+        </div>
+        
+        <h3 style="color: #2c3e50; font-size: 16px;">Exemple avec Python :</h3>
+        
+        <div style="background-color: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; margin: 15px 0; overflow-x: auto;">
+            <pre style="margin: 0; font-family: 'Courier New', monospace; font-size: 13px;">import requests
+
+headers = {
+    "Authorization": "Bearer sk_live_EXAMPLE_KEY_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+}
+
+response = requests.get(
+    "https://odace-pipeline-588398598428.europe-west1.run.app/api/endpoint",
+    headers=headers
+)</pre>
+        </div>
+        
+        <h2 style="color: #2c3e50; font-size: 18px;">Documentation</h2>
+        
+        <p>Pour plus d'informations sur l'utilisation de l'API, consultez notre documentation interactive :</p>
+        
+        <p style="margin: 15px 0;">
+            📚 <a href="https://odace-pipeline-588398598428.europe-west1.run.app/docs" style="color: #3498db; text-decoration: none; font-weight: bold;">Documentation de l'API</a>
+        </p>
+        
+        <h2 style="color: #2c3e50; font-size: 18px;">Informations importantes</h2>
+        
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Sécurité :</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Ne partagez jamais votre clé API</li>
+                <li>Ne la commitez pas dans votre système de contrôle de version</li>
+                <li>Utilisez toujours HTTPS pour vos requêtes</li>
+                <li>Contactez-nous immédiatement si votre clé est compromise</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 5px;">
+                <strong>Détails de la clé :</strong>
+            </p>
+            <p style="color: #7f8c8d; font-size: 13px; margin: 5px 0;">
+                Email : exemple@utilisateur.com<br>
+                Créée le : 29/11/2025 à 15:20:47 UTC
+            </p>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="color: #7f8c8d; font-size: 14px;">
+                Si vous avez des questions ou besoin d'assistance, n'hésitez pas à nous contacter.
+            </p>
+            <p style="color: #7f8c8d; font-size: 14px; margin-top: 20px;">
+                Cordialement,<br>
+                <strong>L'équipe ODACE</strong>
+            </p>
+        </div>
+    </div>
+    
+    <div style="text-align: center; color: #95a5a6; font-size: 12px; margin-top: 20px;">
+        <p>Cet email a été généré automatiquement. Merci de ne pas y répondre.</p>
+    </div>
+    
+</body>
+</html>

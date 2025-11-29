@@ -34,20 +34,20 @@ Authorization: Bearer sk_live_YOUR_API_KEY
 1. **Test your API key**:
    ```bash
    curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
-        https://your-service.run.app/api/pipeline/list
+        https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/list
    ```
 
 2. **View available pipelines**:
    ```bash
    curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
-        https://your-service.run.app/api/pipeline/list?layer=bronze
+        https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/list?layer=bronze
    ```
 
 3. **Run a pipeline**:
    ```bash
    curl -X POST \
         -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
-        https://your-service.run.app/api/bronze/geo
+        https://odace-pipeline-588398598428.europe-west1.run.app/api/bronze/geo
    ```
 
 ## Core API Endpoints
@@ -93,7 +93,7 @@ curl -X POST \
   -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"force": true}' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 
 **Expected Response**:
@@ -133,7 +133,7 @@ curl -X POST \
     "silver_only": false,
     "force": true
   }' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 - **Executes**: 6 bronze + 6 silver = 12 total pipelines
 - **Duration**: ~2-3 minutes
@@ -149,7 +149,7 @@ curl -X POST \
     "bronze_only": true,
     "force": true
   }' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 - **Executes**: 6 bronze pipelines
 - **Duration**: ~1-2 minutes
@@ -165,7 +165,7 @@ curl -X POST \
     "silver_only": true,
     "force": true
   }' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 - **Executes**: 6 silver pipelines
 - **Duration**: ~1 minute
@@ -180,7 +180,7 @@ curl -X POST \
   -d '{
     "force": false
   }' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 - **Executes**: Only pipelines with new data
 - **Duration**: Varies (only processes changes)
@@ -200,13 +200,13 @@ curl -X POST \
 **1. Check job status**:
 ```bash
 curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
-  https://your-service.run.app/api/jobs/{job_id}
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/jobs/{job_id}
 ```
 
 **2. List recent jobs**:
 ```bash
 curl -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
-  https://your-service.run.app/api/jobs?limit=10
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/jobs?limit=10
 ```
 
 **3. View task details**:
@@ -282,7 +282,7 @@ curl -X POST \
   -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"force": true}' \
-  https://your-service.run.app/api/pipeline/run
+  https://odace-pipeline-588398598428.europe-west1.run.app/api/pipeline/run
 ```
 
 The pipeline is **idempotent**, so re-running will clear the error and produce correct results.
@@ -318,14 +318,14 @@ Example with curl:
 curl -X POST \
      -H "Authorization: Bearer sk_live_YOUR_API_KEY" \
      -F "file=@myfile.csv" \
-     "https://your-service.run.app/api/files/upload?domain=logement"
+     "https://odace-pipeline-588398598428.europe-west1.run.app/api/files/upload?domain=logement"
 ```
 
 ### API Documentation
 
 Visit the interactive API documentation at:
 ```
-https://your-service.run.app/docs
+https://odace-pipeline-588398598428.europe-west1.run.app/docs
 ```
 
 ## Available Pipelines
@@ -383,6 +383,54 @@ For developers and administrators:
 - [Implementation Details](docs/IMPLEMENTATION_SUMMARY.md) - Technical architecture and design
 - [Pipeline Fixes](docs/PIPELINE_FIXES_SUMMARY.md) - Pipeline development notes
 - [Test Reports](docs/END_TO_END_TEST_REPORT.md) - Testing documentation
+
+## API Key Management for Administrators
+
+### Generating API Keys for New Users
+
+To create a new API key and email for a user:
+
+```bash
+python3 scripts/send_api_key_email.py
+```
+
+This interactive script will:
+1. Prompt for the user's email address
+2. Create a new API key in Firestore
+3. Generate a professional French HTML email with:
+   - The API key
+   - Usage instructions and code examples
+   - Security best practices
+   - Links to documentation at https://odace-pipeline-588398598428.europe-west1.run.app/docs
+
+The HTML email file will be saved in `scripts/email_templates/` and can be copied directly into Gmail.
+
+**Email sending steps:**
+1. Open the generated HTML file
+2. Copy all content (Cmd+A, Cmd+C)
+3. In Gmail: New message → ⋮ → "Show original HTML"
+4. Paste content and send to user
+5. Delete the HTML file after sending (for security)
+
+### Manual API Key Management
+
+You can also manage API keys via CLI:
+
+```bash
+# Create a key
+python scripts/manage_api_keys.py create user@example.com
+
+# List all keys
+python scripts/manage_api_keys.py list
+
+# Revoke a key
+python scripts/manage_api_keys.py revoke sk_live_...
+
+# Delete a key
+python scripts/manage_api_keys.py delete sk_live_...
+```
+
+See [API Key Usage Guide](docs/API_KEY_USAGE.md) for complete documentation.
 
 ## Local Development
 

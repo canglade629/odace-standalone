@@ -46,6 +46,10 @@ async def cmd_create(user_id: str):
     db = firestore.AsyncClient()
     try:
         result = await create_api_key(user_id, db)
+        
+        if result.get('replaced'):
+            print("\n⚠️  Existing API key for this user was found and replaced.")
+        
         print("\n✅ API Key Created Successfully!")
         print("=" * 80)
         print(f"User ID:    {result['user_id']}")
