@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+Keep documentation clean in a single README, and in single documentation .md per folder (pipelines, front end etc...)

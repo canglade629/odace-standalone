@@ -1,0 +1,1231 @@
+openapi: 3.1.0
+info:
+  title: Odace Data Pipeline API
+  description: "\n## Odace Data Pipeline Platform\n\nA cloud-based data pipeline platform\
+    \ for managing data ingestion, transformation, and processing.\n\n### Features\n\
+    \n* **Multi-layer architecture**: Bronze (ingestion), Silver (transformation),\
+    \ Gold (aggregation)\n* **Delta Lake storage**: Efficient data lake with ACID\
+    \ transactions\n* **API-driven**: RESTful API for pipeline orchestration\n* **Authenticated**:\
+    \ Secure API key authentication\n* **Scalable**: Runs on Google Cloud Run\n\n\
+    ### Authentication\n\nAll endpoints require an API key in the Authorization header:\n\
+    \n```\nAuthorization: Bearer sk_live_YOUR_API_KEY\n```\n\n### Available Pipelines\n\
+    \n**Bronze Layer (Data Ingestion)**:\n- accueillants, geo, logement, gares, lignes,\
+    \ zones_attraction\n\n**Silver Layer (Data Transformation)**:\n- accueillants,\
+    \ geo, logement, gares, lignes, zones_attraction\n\n### Getting Started\n\n1.\
+    \ Obtain an API key from your administrator\n2. Include the API key in all requests:\
+    \ `Authorization: Bearer sk_live_...`\n3. Use `/api/pipeline/list` to see available\
+    \ pipelines\n4. Run pipelines with `/api/bronze/{pipeline_name}` or `/api/silver/{pipeline_name}`\n\
+    \nFor detailed documentation, visit the project repository.\n    "
+  contact:
+    name: Odace Data Team
+    email: data@odace.example.com
+  license:
+    name: Internal Use Only
+  version: 1.0.0
+paths:
+  /api/bronze/{pipeline_name}:
+    post:
+      tags:
+      - bronze
+      summary: Run Bronze Pipeline
+      description: "Run a specific bronze layer pipeline.\n\nArgs:\n    pipeline_name:\
+        \ Name of the bronze pipeline to run\n    force: Force reprocessing of all\
+        \ files\n    api_key: API key for authentication\n    \nReturns:\n    Pipeline\
+        \ run response with job ID and status"
+      operationId: run_bronze_pipeline_api_bronze__pipeline_name__post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: pipeline_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Pipeline Name
+      - name: force
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Force
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/silver/{pipeline_name}:
+    post:
+      tags:
+      - silver
+      summary: Run Silver Pipeline
+      description: "Run a specific silver layer pipeline with dependencies.\n\nArgs:\n\
+        \    pipeline_name: Name of the silver pipeline to run\n    force: Force reprocessing\n\
+        \    api_key: API key for authentication\n    \nReturns:\n    Pipeline run\
+        \ response with job ID and status"
+      operationId: run_silver_pipeline_api_silver__pipeline_name__post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: pipeline_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Pipeline Name
+      - name: force
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Force
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/gold/{pipeline_name}:
+    post:
+      tags:
+      - gold
+      summary: Run Gold Pipeline
+      description: "Run a specific gold layer pipeline (placeholder).\n\nArgs:\n \
+        \   pipeline_name: Name of the gold pipeline to run\n    force: Force reprocessing\n\
+        \    api_key: API key for authentication\n    \nReturns:\n    Pipeline run\
+        \ response"
+      operationId: run_gold_pipeline_api_gold__pipeline_name__post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: pipeline_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Pipeline Name
+      - name: force
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Force
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/pipeline/run:
+    post:
+      tags:
+      - pipeline
+      summary: Run Full Pipeline
+      description: "Run the full data pipeline (bronze \u2192 silver).\n\nArgs:\n\
+        \    request: Pipeline run configuration\n    user_id: User ID from API key\
+        \ authentication\n    \nReturns:\n    Summary of pipeline execution including\
+        \ job ID"
+      operationId: run_full_pipeline_api_pipeline_run_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/FullPipelineRunRequest'
+              title: Pipeline Request
+              default:
+                bronze_only: false
+                silver_only: false
+                force: false
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/pipeline/status/{run_id}:
+    get:
+      tags:
+      - pipeline
+      summary: Get Pipeline Status
+      description: "Get status of a pipeline run.\n\nArgs:\n    run_id: Pipeline run\
+        \ ID\n    api_key: API key for authentication\n    \nReturns:\n    Pipeline\
+        \ status details"
+      operationId: get_pipeline_status_api_pipeline_status__run_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/pipeline/history:
+    get:
+      tags:
+      - pipeline
+      summary: Get Pipeline History
+      description: "Get recent pipeline execution history.\n\nArgs:\n    limit: Maximum\
+        \ number of entries to return\n    api_key: API key for authentication\n \
+        \   \nReturns:\n    List of recent pipeline executions"
+      operationId: get_pipeline_history_api_pipeline_history_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/pipeline/list:
+    get:
+      tags:
+      - pipeline
+      summary: List Pipelines
+      description: "List all available pipelines.\n\nArgs:\n    layer: Optional layer\
+        \ filter (bronze/silver/gold)\n    api_key: API key for authentication\n \
+        \   \nReturns:\n    List of available pipelines"
+      operationId: list_pipelines_api_pipeline_list_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: layer
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Layer
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/files/upload:
+    post:
+      tags:
+      - files
+      summary: Upload File
+      description: "Upload a file to the raw data folder in GCS.\n\nArgs:\n    domain:\
+        \ Domain/folder name (e.g., 'accueillants', 'geo', 'logement')\n    file:\
+        \ File to upload\n    api_key: API key for authentication\n    \nReturns:\n\
+        \    File upload response with destination path"
+      operationId: upload_file_api_files_upload_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Domain
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_file_api_files_upload_post'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/files/list:
+    get:
+      tags:
+      - files
+      summary: List Files
+      description: "List files in raw data storage.\n\nArgs:\n    domain: Optional\
+        \ domain filter\n    api_key: API key for authentication\n    \nReturns:\n\
+        \    List of files"
+      operationId: list_files_api_files_list_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: domain
+        in: query
+        required: false
+        schema:
+          type: string
+          title: Domain
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/data/catalog:
+    get:
+      tags:
+      - data
+      summary: Get Catalog
+      description: 'Get the complete data catalog with all schemas and tables.
+
+
+        Scans GCS for Delta tables in bronze, silver, and gold layers.'
+      operationId: get_catalog_api_data_catalog_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogResponse'
+      security:
+      - HTTPBearer: []
+  /api/data/table/{layer}/{table}:
+    get:
+      tags:
+      - data
+      summary: Get Table Metadata
+      description: "Get metadata for a specific table including schema and row count.\n\
+        \nArgs:\n    layer: Layer name (bronze, silver, gold)\n    table: Table name"
+      operationId: get_table_metadata_api_data_table__layer___table__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: layer
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer
+      - name: table
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Table
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableSchema'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/data/preview/{layer}/{table}:
+    post:
+      tags:
+      - data
+      summary: Preview Table
+      description: "Get a preview of table data with optional filtering and sorting.\n\
+        \nArgs:\n    layer: Layer name (bronze, silver, gold)\n    table: Table name\n\
+        \    preview_req: Preview request with filters and sort options"
+      operationId: preview_table_api_data_preview__layer___table__post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: layer
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Layer
+      - name: table
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/data/query:
+    post:
+      tags:
+      - data
+      summary: Execute Sql Query
+      description: "Execute a SQL query against Delta tables.\n\nTables should be\
+        \ referenced as layer_table_name (e.g., bronze_accueillants, silver_geo).\n\
+        All available Delta tables are automatically registered.\n\nArgs:\n    query_req:\
+        \ SQL query request with query string and optional limit"
+      operationId: execute_sql_query_api_data_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/jobs:
+    get:
+      tags:
+      - jobs
+      summary: List Jobs
+      description: "List recent jobs with progress.\n\nArgs:\n    limit: Maximum number\
+        \ of jobs to return\n    api_key: API key for authentication\n    \nReturns:\n\
+        \    List of jobs with progress information"
+      operationId: list_jobs_api_jobs_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 50
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response List Jobs Api Jobs Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/jobs/{job_id}:
+    get:
+      tags:
+      - jobs
+      summary: Get Job
+      description: "Get job details including all tasks.\n\nArgs:\n    job_id: Job\
+        \ ID\n    api_key: API key for authentication\n    \nReturns:\n    Job details\
+        \ with task breakdown"
+      operationId: get_job_api_jobs__job_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Job Api Jobs  Job Id  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/api-keys:
+    get:
+      tags:
+      - admin
+      summary: List All Api Keys
+      description: "List all API keys (without plaintext keys).\n\nRequires admin\
+        \ authentication via ADMIN_SECRET.\n\nArgs:\n    db: Firestore async client\n\
+        \    \nReturns:\n    List of API key metadata"
+      operationId: list_all_api_keys_admin_api_keys_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/APIKeyInfo'
+                type: array
+                title: Response List All Api Keys Admin Api Keys Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - admin
+      summary: Create New Api Key
+      description: "Create a new API key for a user.\n\nRequires admin authentication\
+        \ via ADMIN_SECRET.\n\nArgs:\n    request: Contains user_id for the new API\
+        \ key\n    db: Firestore async client\n    \nReturns:\n    The newly created\
+        \ API key (shown only once)"
+      operationId: create_new_api_key_admin_api_keys_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPIKeyRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAPIKeyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /admin/api-keys/revoke:
+    delete:
+      tags:
+      - admin
+      summary: Revoke Existing Api Key
+      description: "Revoke an API key (soft delete - sets active=False).\n\nRequires\
+        \ admin authentication via ADMIN_SECRET.\n\nArgs:\n    request: Contains the\
+        \ API key to revoke\n    db: Firestore async client\n    \nReturns:\n    Success\
+        \ message"
+      operationId: revoke_existing_api_key_admin_api_keys_revoke_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeAPIKeyRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /admin/api-keys/delete:
+    delete:
+      tags:
+      - admin
+      summary: Delete Existing Api Key
+      description: "Permanently delete an API key from Firestore.\n\nRequires admin\
+        \ authentication via ADMIN_SECRET.\n\nArgs:\n    request: Contains the API\
+        \ key to delete\n    db: Firestore async client\n    \nReturns:\n    Success\
+        \ message"
+      operationId: delete_existing_api_key_admin_api_keys_delete_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAPIKeyRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /:
+    get:
+      summary: Root
+      description: Serve the main UI.
+      operationId: root__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+  /health:
+    get:
+      summary: Health Check
+      description: Health check endpoint.
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    APIKeyInfo:
+      properties:
+        hash:
+          type: string
+          title: Hash
+        user_id:
+          type: string
+          title: User Id
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+        last_used_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Used At
+        active:
+          type: boolean
+          title: Active
+      type: object
+      required:
+      - hash
+      - user_id
+      - created_at
+      - last_used_at
+      - active
+      title: APIKeyInfo
+      description: API key metadata (without plaintext key).
+    Body_upload_file_api_files_upload_post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_file_api_files_upload_post
+    CatalogResponse:
+      properties:
+        schemas:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/TableInfo'
+            type: array
+          type: object
+          title: Schemas
+      type: object
+      required:
+      - schemas
+      title: CatalogResponse
+      description: Catalog response with all schemas and tables.
+    CreateAPIKeyRequest:
+      properties:
+        user_id:
+          type: string
+          title: User Id
+      type: object
+      required:
+      - user_id
+      title: CreateAPIKeyRequest
+      description: Request model for creating a new API key.
+    CreateAPIKeyResponse:
+      properties:
+        api_key:
+          type: string
+          title: Api Key
+        user_id:
+          type: string
+          title: User Id
+        created_at:
+          type: string
+          title: Created At
+        message:
+          type: string
+          title: Message
+          default: API key created successfully. Save this key - it will not be shown
+            again.
+      type: object
+      required:
+      - api_key
+      - user_id
+      - created_at
+      title: CreateAPIKeyResponse
+      description: Response model for API key creation.
+    DeleteAPIKeyRequest:
+      properties:
+        api_key:
+          type: string
+          title: Api Key
+      type: object
+      required:
+      - api_key
+      title: DeleteAPIKeyRequest
+      description: Request model for deleting an API key.
+    FileUploadResponse:
+      properties:
+        filename:
+          type: string
+          title: Filename
+        destination:
+          type: string
+          title: Destination
+        size_bytes:
+          type: integer
+          title: Size Bytes
+        uploaded_at:
+          type: string
+          format: date-time
+          title: Uploaded At
+      type: object
+      required:
+      - filename
+      - destination
+      - size_bytes
+      - uploaded_at
+      title: FileUploadResponse
+      description: Response for file upload.
+      example:
+        destination: raw/geo/communes_2024.csv
+        filename: communes_2024.csv
+        size_bytes: 1048576
+        uploaded_at: '2025-11-29T10:30:00Z'
+    FullPipelineRunRequest:
+      properties:
+        bronze_only:
+          type: boolean
+          title: Bronze Only
+          description: Run only bronze layer
+          default: false
+        silver_only:
+          type: boolean
+          title: Silver Only
+          description: Run only silver layer
+          default: false
+        force:
+          type: boolean
+          title: Force
+          description: Force reprocessing
+          default: false
+      type: object
+      title: FullPipelineRunRequest
+      description: Request to run the full pipeline.
+      example:
+        bronze_only: false
+        force: false
+        silver_only: false
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+          default: healthy
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+        version:
+          type: string
+          title: Version
+          default: 1.0.0
+      type: object
+      required:
+      - timestamp
+      title: HealthResponse
+      description: Health check response.
+    PipelineInfo:
+      properties:
+        name:
+          type: string
+          title: Name
+        layer:
+          $ref: '#/components/schemas/PipelineLayer'
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        dependencies:
+          items:
+            type: string
+          type: array
+          title: Dependencies
+      type: object
+      required:
+      - name
+      - layer
+      title: PipelineInfo
+      description: Information about a registered pipeline.
+      example:
+        dependencies: []
+        description: Ingest French commune geographic data
+        layer: bronze
+        name: geo
+    PipelineLayer:
+      type: string
+      enum:
+      - bronze
+      - silver
+      - gold
+      title: PipelineLayer
+      description: Pipeline layer types.
+    PipelineListResponse:
+      properties:
+        pipelines:
+          items:
+            $ref: '#/components/schemas/PipelineInfo'
+          type: array
+          title: Pipelines
+      type: object
+      required:
+      - pipelines
+      title: PipelineListResponse
+      description: List of available pipelines.
+    PipelineRunResponse:
+      properties:
+        run_id:
+          type: string
+          title: Run Id
+          description: Unique run identifier
+        pipeline_name:
+          type: string
+          title: Pipeline Name
+        layer:
+          $ref: '#/components/schemas/PipelineLayer'
+        status:
+          $ref: '#/components/schemas/PipelineStatus'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        message:
+          type: string
+          title: Message
+          default: ''
+      type: object
+      required:
+      - run_id
+      - pipeline_name
+      - layer
+      - status
+      - started_at
+      title: PipelineRunResponse
+      description: Response for pipeline run.
+      example:
+        layer: bronze
+        message: Pipeline execution started
+        pipeline_name: geo
+        run_id: 550e8400-e29b-41d4-a716-446655440000
+        started_at: '2025-11-29T10:30:00Z'
+        status: running
+    PipelineStatus:
+      type: string
+      enum:
+      - pending
+      - running
+      - success
+      - failed
+      title: PipelineStatus
+      description: Pipeline execution status.
+    PipelineStatusResponse:
+      properties:
+        run_id:
+          type: string
+          title: Run Id
+        pipeline_name:
+          type: string
+          title: Pipeline Name
+        layer:
+          $ref: '#/components/schemas/PipelineLayer'
+        status:
+          $ref: '#/components/schemas/PipelineStatus'
+        started_at:
+          type: string
+          format: date-time
+          title: Started At
+        completed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Completed At
+        duration_seconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Duration Seconds
+        message:
+          type: string
+          title: Message
+          default: ''
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        stats:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Stats
+      type: object
+      required:
+      - run_id
+      - pipeline_name
+      - layer
+      - status
+      - started_at
+      title: PipelineStatusResponse
+      description: Response for pipeline status query.
+      example:
+        completed_at: '2025-11-29T10:35:00Z'
+        duration_seconds: 300.5
+        layer: bronze
+        message: Successfully processed 50 files
+        pipeline_name: geo
+        run_id: 550e8400-e29b-41d4-a716-446655440000
+        started_at: '2025-11-29T10:30:00Z'
+        stats:
+          files_processed: 50
+          files_skipped: 2
+          records_ingested: 15000
+        status: success
+    PreviewFilter:
+      properties:
+        column:
+          type: string
+          title: Column
+        operator:
+          type: string
+          title: Operator
+          default: '='
+        value:
+          type: string
+          title: Value
+      type: object
+      required:
+      - column
+      - value
+      title: PreviewFilter
+      description: Filter specification for table preview.
+    PreviewRequest:
+      properties:
+        limit:
+          type: integer
+          title: Limit
+          default: 100
+        filters:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/PreviewFilter'
+            type: array
+          - type: 'null'
+          title: Filters
+        sort_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+        sort_order:
+          type: string
+          title: Sort Order
+          default: asc
+      type: object
+      title: PreviewRequest
+      description: Request for table preview.
+    PreviewResponse:
+      properties:
+        columns:
+          items:
+            type: string
+          type: array
+          title: Columns
+        data:
+          items:
+            type: object
+          type: array
+          title: Data
+        total_rows:
+          type: integer
+          title: Total Rows
+        filtered_rows:
+          type: integer
+          title: Filtered Rows
+        preview_rows:
+          type: integer
+          title: Preview Rows
+      type: object
+      required:
+      - columns
+      - data
+      - total_rows
+      - filtered_rows
+      - preview_rows
+      title: PreviewResponse
+      description: Table preview response.
+    QueryRequest:
+      properties:
+        sql:
+          type: string
+          title: Sql
+        limit:
+          type: integer
+          title: Limit
+          default: 1000
+      type: object
+      required:
+      - sql
+      title: QueryRequest
+      description: Request for SQL query execution.
+    QueryResponse:
+      properties:
+        columns:
+          items:
+            type: string
+          type: array
+          title: Columns
+        data:
+          items:
+            type: object
+          type: array
+          title: Data
+        row_count:
+          type: integer
+          title: Row Count
+        execution_time_ms:
+          type: number
+          title: Execution Time Ms
+      type: object
+      required:
+      - columns
+      - data
+      - row_count
+      - execution_time_ms
+      title: QueryResponse
+      description: SQL query execution response.
+    RevokeAPIKeyRequest:
+      properties:
+        api_key:
+          type: string
+          title: Api Key
+      type: object
+      required:
+      - api_key
+      title: RevokeAPIKeyRequest
+      description: Request model for revoking an API key.
+    SchemaField:
+      properties:
+        name:
+          type: string
+          title: Name
+        type:
+          type: string
+          title: Type
+        nullable:
+          type: boolean
+          title: Nullable
+      type: object
+      required:
+      - name
+      - type
+      - nullable
+      title: SchemaField
+      description: Schema field information.
+    TableInfo:
+      properties:
+        name:
+          type: string
+          title: Name
+        path:
+          type: string
+          title: Path
+        version:
+          type: integer
+          title: Version
+      type: object
+      required:
+      - name
+      - path
+      - version
+      title: TableInfo
+      description: Table information.
+    TableSchema:
+      properties:
+        fields:
+          items:
+            $ref: '#/components/schemas/SchemaField'
+          type: array
+          title: Fields
+        version:
+          type: integer
+          title: Version
+        row_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Row Count
+        num_fields:
+          type: integer
+          title: Num Fields
+      type: object
+      required:
+      - fields
+      - version
+      - row_count
+      - num_fields
+      title: TableSchema
+      description: Table schema information.
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+tags:
+- name: bronze
+  description: Bronze layer operations - Raw data ingestion from source files into
+    Delta tables
+- name: silver
+  description: Silver layer operations - Data transformation, cleaning, and standardization
+- name: gold
+  description: Gold layer operations - Business-level aggregations and metrics
+- name: pipeline
+  description: Pipeline orchestration - Run full pipelines, check status, view history
+- name: files
+  description: File management - Upload and list raw data files
+- name: data
+  description: Data access - Query processed data from Delta tables
+- name: jobs
+  description: Job monitoring - Track long-running pipeline executions
+- name: admin
+  description: Admin operations - API key management and system administration

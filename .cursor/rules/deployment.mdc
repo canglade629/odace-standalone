@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+Our main front end should be deployed in Cloud run in a single service. The backend should be all APIs and also hosted on the same Cloud Run service. I should be able to call those backend API to launch jobs, observe status, monitor etc...
+
+All deployements should be done through Terraform. Don't forget to update those terraform scripts if needed when developing new features

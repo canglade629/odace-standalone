@@ -1,0 +1,136 @@
+"""Pipeline registry for managing and discovering pipelines."""
+from typing import Dict, List, Type, Optional
+from app.core.models import PipelineLayer, PipelineInfo
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class PipelineRegistry:
+    """Central registry for all data pipelines."""
+    
+    def __init__(self):
+        self._pipelines: Dict[str, Dict[str, Type]] = {
+            "bronze": {},
+            "silver": {},
+            "gold": {}
+        }
+        self._dependencies: Dict[str, List[str]] = {}
+    
+    def register(
+        self,
+        layer: PipelineLayer,
+        name: str,
+        pipeline_class: Type,
+        dependencies: Optional[List[str]] = None
+    ):
+        """
+        Register a pipeline.
+        
+        Args:
+            layer: Pipeline layer (bronze/silver/gold)
+            name: Pipeline name
+            pipeline_class: Pipeline class
+            dependencies: List of pipeline names this pipeline depends on
+        """
+        layer_str = layer.value if isinstance(layer, PipelineLayer) else layer
+        
+        if name in self._pipelines[layer_str]:
+            logger.warning(f"Pipeline {layer_str}.{name} already registered, overwriting")
+        
+        self._pipelines[layer_str][name] = pipeline_class
+        
+        # Store dependencies
+        full_name = f"{layer_str}.{name}"
+        self._dependencies[full_name] = dependencies or []
+        
+        logger.info(f"Registered pipeline: {full_name}")
+    
+    def get(self, layer: PipelineLayer, name: str) -> Optional[Type]:
+        """
+        Get a pipeline class by layer and name.
+        
+        Args:
+            layer: Pipeline layer
+            name: Pipeline name
+            
+        Returns:
+            Pipeline class or None if not found
+        """
+        layer_str = layer.value if isinstance(layer, PipelineLayer) else layer
+        return self._pipelines.get(layer_str, {}).get(name)
+    
+    def list_pipelines(self, layer: Optional[PipelineLayer] = None) -> List[PipelineInfo]:
+        """
+        List all registered pipelines.
+        
+        Args:
+            layer: Optional layer to filter by
+            
+        Returns:
+            List of pipeline information
+        """
+        pipelines = []
+        
+        layers_to_check = [layer.value] if layer else ["bronze", "silver", "gold"]
+        
+        for layer_name in layers_to_check:
+            for name, pipeline_class in self._pipelines[layer_name].items():
+                full_name = f"{layer_name}.{name}"
+                description = pipeline_class.__doc__
+                if description:
+                    description = description.strip().split('\n')[0]
+                
+                pipelines.append(PipelineInfo(
+                    name=name,
+                    layer=PipelineLayer(layer_name),
+                    description=description,
+                    dependencies=self._dependencies.get(full_name, [])
+                ))
+        
+        return pipelines
+    
+    def get_dependencies(self, layer: PipelineLayer, name: str) -> List[str]:
+        """
+        Get dependencies for a pipeline.
+        
+        Args:
+            layer: Pipeline layer
+            name: Pipeline name
+            
+        Returns:
+            List of dependency pipeline names (format: "layer.name")
+        """
+        layer_str = layer.value if isinstance(layer, PipelineLayer) else layer
+        full_name = f"{layer_str}.{name}"
+        return self._dependencies.get(full_name, [])
+
+
+# Global registry instance
+_registry = PipelineRegistry()
+
+
+def get_registry() -> PipelineRegistry:
+    """Get the global pipeline registry."""
+    return _registry
+
+
+def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] = None):
+    """
+    Decorator to register a pipeline class.
+    
+    Args:
+        layer: Pipeline layer (bronze/silver/gold)
+        name: Pipeline name
+        dependencies: List of pipeline names this depends on (format: "layer.name")
+        
+    Example:
+        @register_pipeline(layer="bronze", name="accueillants")
+        class BronzeAccueillantsPipeline(BaseBronzePipeline):
+            pass
+    """
+    def decorator(cls):
+        _registry.register(layer, name, cls, dependencies)
+        return cls
+    return decorator
+

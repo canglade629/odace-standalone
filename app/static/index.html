@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odace Data Pipeline</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Odace Data Pipeline</h1>
+            <p>Platform-agnostic data processing for bronze, silver, and gold layers</p>
+        </header>
+
+        <div class="api-key-section">
+            <label for="apiKey">API Key:</label>
+            <input type="password" id="apiKey" placeholder="Enter your API key" />
+            <button onclick="saveApiKey()">Save</button>
+        </div>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="showTab('pipelines')">Pipelines</button>
+            <button class="tab-button" onclick="showTab('history')">History</button>
+            <button class="tab-button" onclick="showTab('files')">Files</button>
+            <button class="tab-button" onclick="showTab('data')">Data</button>
+            <button class="tab-button" onclick="showTab('sql')">SQL Query</button>
+        </nav>
+
+        <div id="pipelines" class="tab-content active">
+            <h2>Run Pipelines</h2>
+            
+            <div class="pipeline-section">
+                <h3>Full Pipeline</h3>
+                <button onclick="runFullPipeline()" class="btn btn-primary">Run Full Pipeline (Bronze → Silver)</button>
+                <button onclick="runFullPipeline(true, false)" class="btn btn-secondary">Run Bronze Only</button>
+                <button onclick="runFullPipeline(false, true)" class="btn btn-secondary">Run Silver Only</button>
+            </div>
+
+            <div class="pipeline-section">
+                <h3>Bronze Layer</h3>
+                <div id="bronze-pipelines" class="pipeline-grid"></div>
+            </div>
+
+            <div class="pipeline-section">
+                <h3>Silver Layer</h3>
+                <div id="silver-pipelines" class="pipeline-grid"></div>
+            </div>
+
+            <div class="pipeline-section">
+                <h3>Gold Layer</h3>
+                <div id="gold-pipelines" class="pipeline-grid">
+                    <p class="info-text">Gold layer pipelines not yet implemented. Add as needed.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="history" class="tab-content">
+            <div class="catalog-header">
+                <h2>Job History</h2>
+                <button onclick="loadJobHistory()" class="btn-icon" title="Refresh job history">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="job-history-list"></div>
+        </div>
+
+        <div id="files" class="tab-content">
+            <h2>File Management</h2>
+            
+            <div class="file-section">
+                <h3>Upload File</h3>
+                <div class="upload-form">
+                    <label for="domain">Domain:</label>
+                    <select id="domain">
+                        <option value="accueillants">accueillants</option>
+                        <option value="geo">geo</option>
+                        <option value="logement">logement</option>
+                        <option value="transport/gares">transport/gares</option>
+                        <option value="transport/lignes">transport/lignes</option>
+                        <option value="zones_attraction">zones_attraction</option>
+                    </select>
+                    <input type="file" id="fileInput" />
+                    <button onclick="uploadFile()" class="btn btn-primary">Upload</button>
+                </div>
+            </div>
+
+            <div class="file-section">
+                <div class="catalog-header">
+                    <h3>List Files</h3>
+                    <button onclick="listFiles()" class="btn-icon" title="Refresh file list">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="file-list"></div>
+            </div>
+        </div>
+
+        <div id="data" class="tab-content">
+            <div class="catalog-header">
+                <h2>Data Catalog</h2>
+                <button onclick="loadCatalog()" class="btn-icon" title="Refresh catalog">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="data-catalog-container">
+                <div class="catalog-tree">
+                    <h3>Tables</h3>
+                    <div id="catalog-tree-content" class="tree-content">
+                        <p class="info-text">Loading catalog...</p>
+                    </div>
+                </div>
+                
+                <div class="catalog-detail">
+                    <div id="table-info" class="table-info-section">
+                        <p class="info-text">Select a table to view details</p>
+                    </div>
+                </div>
+                
+                <div class="catalog-controls">
+                    <div id="table-controls" class="table-controls-section">
+                        <p class="info-text">Select a table to view controls</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sql" class="tab-content">
+            <div class="catalog-header">
+                <h2>SQL Query</h2>
+                <button onclick="loadSQLQueryTab()" class="btn-icon" title="Refresh tables">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="sql-query-container">
+                <div class="catalog-tree">
+                    <h3>Tables</h3>
+                    <div id="sql-catalog-tree-content" class="tree-content">
+                        <p class="info-text">Loading catalog...</p>
+                    </div>
+                </div>
+                
+                <div class="sql-main-panel">
+                    <div class="sql-editor-panel">
+                        <div class="sql-editor-header">
+                            <h3>SQL Editor</h3>
+                            <div class="sql-editor-actions">
+                                <button onclick="clearSQLEditor()" class="btn btn-small btn-secondary">Clear</button>
+                                <button onclick="runSQLQuery()" class="btn btn-small btn-primary sql-run-button">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                    Run Query
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="sql-editor" class="sql-editor" placeholder="Enter SQL query here...&#10;&#10;Example:&#10;SELECT * FROM bronze_accueillants LIMIT 10;&#10;&#10;Tables are referenced as: layer_table_name&#10;  - bronze_accueillants&#10;  - silver_geo&#10;  - etc.&#10;&#10;Press Ctrl+Enter to run"></textarea>
+                        <div class="sql-editor-footer">
+                            <span id="sql-query-info" class="sql-query-info"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="sql-results-panel">
+                        <div class="sql-results-header">
+                            <h3>Results</h3>
+                            <span id="sql-results-info" class="sql-results-info"></span>
+                        </div>
+                        <div id="sql-results-content" class="sql-results-content">
+                            <p class="info-text">Run a query to see results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="status-message"></div>
+    </div>
+
+    <!-- Job Details Modal -->
+    <div id="job-modal" class="modal-overlay" onclick="closeJobModal()">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modal-job-title">Job Details</h3>
+                <button class="modal-close-btn" onclick="closeJobModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <div class="loading-tasks">Loading tasks...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let apiKey = localStorage.getItem('apiKey') || '';
+        
+        if (apiKey) {
+            document.getElementById('apiKey').value = apiKey;
+        }
+
+        function saveApiKey() {
+            apiKey = document.getElementById('apiKey').value;
+            localStorage.setItem('apiKey', apiKey);
+            showStatus('API key saved', 'success');
+            // Load pipelines after saving API key
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab.id === 'pipelines') {
+                loadPipelines();
+            }
+        }
+
+        function getHeaders() {
+            return {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'history') {
+                loadJobHistory();
+            } else if (tabName === 'pipelines') {
+                loadPipelines();
+            } else if (tabName === 'files') {
+                listFiles();
+            } else if (tabName === 'data') {
+                loadCatalog();
+            } else if (tabName === 'sql') {
+                loadSQLQueryTab();
+            }
+        }
+
+        async function loadPipelines() {
+            try {
+                const response = await fetch(`${API_BASE}/api/pipeline/list`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                const bronzeDiv = document.getElementById('bronze-pipelines');
+                const silverDiv = document.getElementById('silver-pipelines');
+                
+                bronzeDiv.innerHTML = '';
+                silverDiv.innerHTML = '';
+                
+                data.pipelines.forEach(pipeline => {
+                    const card = createPipelineCard(pipeline);
+                    if (pipeline.layer === 'bronze') {
+                        bronzeDiv.appendChild(card);
+                    } else if (pipeline.layer === 'silver') {
+                        silverDiv.appendChild(card);
+                    }
+                });
+            } catch (error) {
+                showStatus('Error loading pipelines: ' + error.message, 'error');
+            }
+        }
+
+        function createPipelineCard(pipeline) {
+            const card = document.createElement('div');
+            card.className = 'pipeline-card';
+            
+            card.innerHTML = `
+                <h4>${pipeline.name}</h4>
+                <p>${pipeline.description || 'No description'}</p>
+                <button onclick="runPipeline('${pipeline.layer}', '${pipeline.name}')" class="btn btn-small">Run</button>
+            `;
+            
+            return card;
+        }
+
+        async function runPipeline(layer, name) {
+            showStatus(`Starting ${layer}.${name}...`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/${layer}/${name}`, {
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Pipeline ${name} completed: ${data.status}`, 'success');
+                } else {
+                    showStatus(`Pipeline ${name} failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function runFullPipeline(bronzeOnly = false, silverOnly = false) {
+            showStatus('Starting full pipeline...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/pipeline/run`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        bronze_only: bronzeOnly,
+                        silver_only: silverOnly,
+                        force: false
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Full pipeline completed: ${data.succeeded}/${data.total_pipelines} succeeded`, 'success');
+                } else {
+                    showStatus('Pipeline failed: ' + data.detail, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        let jobHistoryRefreshInterval = null;
+
+        async function loadJobHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/api/jobs?limit=20`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                const historyDiv = document.getElementById('job-history-list');
+                
+                if (data.jobs.length === 0) {
+                    const emptyMsg = document.createElement('p');
+                    emptyMsg.className = 'info-text';
+                    emptyMsg.textContent = 'No job history yet';
+                    historyDiv.replaceChildren(emptyMsg);
+                    clearJobHistoryRefresh();
+                    return;
+                }
+                
+                // Check if there are any running jobs
+                const hasRunningJobs = data.jobs.some(job => job.status === 'running' || job.status === 'pending');
+                
+                // Create job list
+                const jobList = document.createElement('div');
+                jobList.className = 'job-list';
+                
+                data.jobs.forEach(job => {
+                    const jobItem = createJobItem(job);
+                    jobList.appendChild(jobItem);
+                });
+                
+                // Replace content atomically to avoid flicker
+                historyDiv.replaceChildren(jobList);
+                
+                // Refresh modal if it's open (but don't show the modal again if user closed it)
+                if (currentModalJobId) {
+                    const modal = document.getElementById('job-modal');
+                    if (modal.classList.contains('active')) {
+                        openJobModal(currentModalJobId, true); // Pass true to indicate this is a refresh
+                    }
+                }
+                
+                // Auto-refresh if there are running jobs
+                if (hasRunningJobs) {
+                    startJobHistoryRefresh();
+                } else {
+                    clearJobHistoryRefresh();
+                }
+            } catch (error) {
+                showStatus('Error loading job history: ' + error.message, 'error');
+                clearJobHistoryRefresh();
+            }
+        }
+
+        function createJobItem(job) {
+            const jobItem = document.createElement('div');
+            jobItem.className = 'job-item';
+            jobItem.dataset.jobId = job.job_id;
+            
+            const statusClass = getStatusClass(job.status);
+            
+            // Format user display (show email or "System" if no user)
+            const userDisplay = job.user_id ? job.user_id : 'System';
+            
+            jobItem.innerHTML = `
+                <div class="job-header">
+                    <div class="job-main-info">
+                        <div class="job-name-status">
+                            <h4>${job.job_name}</h4>
+                            <span class="badge badge-${statusClass}">${job.status}</span>
+                        </div>
+                        <div class="job-meta">
+                            <span class="job-user" title="Triggered by ${userDisplay}">${userDisplay}</span>
+                            <span class="job-date">${formatDate(job.started_at)}</span>
+                            <span class="job-tasks">${job.completed_tasks}/${job.total_tasks} tasks</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-small view-details-btn" onclick="openJobModal('${job.job_id}')">View Details</button>
+                </div>
+            `;
+            
+            return jobItem;
+        }
+
+        let currentModalJobId = null;
+        let taskTimerInterval = null;
+
+        function updateRunningTimers() {
+            const runningTimers = document.querySelectorAll('.running-timer');
+            runningTimers.forEach(timer => {
+                const startTime = parseInt(timer.getAttribute('data-start-time'));
+                if (startTime) {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    timer.textContent = formatDuration(elapsed);
+                }
+            });
+        }
+
+        async function openJobModal(jobId, isRefresh = false) {
+            currentModalJobId = jobId;
+            const modal = document.getElementById('job-modal');
+            const modalTitle = document.getElementById('modal-job-title');
+            const modalBody = document.getElementById('modal-body');
+            
+            // Show modal (if not already shown)
+            if (!isRefresh) {
+                modal.classList.add('active');
+                modalBody.innerHTML = '<div class="loading-tasks">Loading tasks...</div>';
+            }
+            
+            // Fetch job details with tasks
+            try {
+                const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
+                    headers: getHeaders()
+                });
+                const jobData = await response.json();
+                
+                // Update modal title
+                modalTitle.textContent = jobData.job_name || 'Job Details';
+                
+                // Organize tasks by layer
+                if (jobData.tasks && jobData.tasks.length > 0) {
+                    const bronzeTasks = jobData.tasks.filter(t => t.layer === 'bronze');
+                    const silverTasks = jobData.tasks.filter(t => t.layer === 'silver');
+                    
+                    let html = '';
+                    
+                    // Add job metadata at the top
+                    const userDisplay = jobData.user_id ? jobData.user_id : 'System';
+                    html += `
+                        <div class="job-modal-meta">
+                            <div class="meta-item">
+                                <strong>Triggered by:</strong> ${userDisplay}
+                            </div>
+                            <div class="meta-item">
+                                <strong>Started:</strong> ${formatDate(jobData.started_at)}
+                            </div>
+                            <div class="meta-item">
+                                <strong>Status:</strong> <span class="badge badge-${getStatusClass(jobData.status)}">${jobData.status}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Bronze section
+                    if (bronzeTasks.length > 0) {
+                        html += '<div class="modal-section"><h3>Bronze Pipelines</h3>';
+                        html += createTasksTableHTML(bronzeTasks);
+                        html += '</div>';
+                    }
+                    
+                    // Silver section
+                    if (silverTasks.length > 0) {
+                        html += '<div class="modal-section"><h3>Silver Pipelines</h3>';
+                        html += createTasksTableHTML(silverTasks);
+                        html += '</div>';
+                    }
+                    
+                    modalBody.innerHTML = html;
+                    
+                    // Start live timer if there are running tasks
+                    const hasRunningTasks = jobData.tasks.some(t => t.status === 'running');
+                    if (hasRunningTasks) {
+                        // Clear any existing interval
+                        if (taskTimerInterval) {
+                            clearInterval(taskTimerInterval);
+                        }
+                        // Start new interval to update every second
+                        taskTimerInterval = setInterval(updateRunningTimers, 1000);
+                    } else {
+                        // No running tasks, clear interval if it exists
+                        if (taskTimerInterval) {
+                            clearInterval(taskTimerInterval);
+                            taskTimerInterval = null;
+                        }
+                    }
+                } else {
+                    modalBody.innerHTML = '<p class="info-text">No tasks found</p>';
+                }
+            } catch (error) {
+                modalBody.innerHTML = `<p class="error-text">Error loading tasks: ${error.message}</p>`;
+            }
+        }
+
+        function closeJobModal() {
+            const modal = document.getElementById('job-modal');
+            modal.classList.remove('active');
+            currentModalJobId = null;
+            
+            // Clear timer interval when modal closes
+            if (taskTimerInterval) {
+                clearInterval(taskTimerInterval);
+                taskTimerInterval = null;
+            }
+        }
+
+        function createTasksTableHTML(tasks) {
+            let html = `
+                <table class="tasks-table">
+                    <thead>
+                        <tr>
+                            <th>Pipeline</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            tasks.forEach(task => {
+                const statusClass = getStatusClass(task.status);
+                
+                // Calculate duration - for running tasks, show elapsed time with live timer
+                let durationDisplay;
+                if (task.status === 'running' && task.started_at) {
+                    const startTime = new Date(task.started_at);
+                    const startTimeMs = startTime.getTime();
+                    const elapsed = (Date.now() - startTimeMs) / 1000;
+                    durationDisplay = `<span class="running-timer" data-start-time="${startTimeMs}">${formatDuration(elapsed)}</span>`;
+                } else {
+                    durationDisplay = formatDuration(task.duration_seconds);
+                }
+                
+                html += `
+                    <tr>
+                        <td>${task.layer}.${task.pipeline_name}</td>
+                        <td><span class="badge badge-${statusClass}">${task.status}</span></td>
+                        <td>${formatDate(task.started_at)}</td>
+                        <td>${durationDisplay}</td>
+                        <td class="task-message">${task.message || task.error || '-'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            return html;
+        }
+
+
+        function getStatusClass(status) {
+            const statusMap = {
+                'success': 'success',
+                'failed': 'failed',
+                'running': 'running',
+                'pending': 'pending',
+                'partial': 'warning'
+            };
+            return statusMap[status] || 'pending';
+        }
+
+        function startJobHistoryRefresh() {
+            if (!jobHistoryRefreshInterval) {
+                jobHistoryRefreshInterval = setInterval(() => {
+                    loadJobHistory();
+                }, 5000); // Refresh every 5 seconds
+            }
+        }
+
+        function clearJobHistoryRefresh() {
+            if (jobHistoryRefreshInterval) {
+                clearInterval(jobHistoryRefreshInterval);
+                jobHistoryRefreshInterval = null;
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const domain = document.getElementById('domain').value;
+            
+            if (!fileInput.files.length) {
+                showStatus('Please select a file', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/files/upload?domain=${domain}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`File uploaded: ${data.filename}`, 'success');
+                    fileInput.value = '';
+                    listFiles();
+                } else {
+                    showStatus('Upload failed: ' + data.detail, 'error');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function listFiles() {
+            try {
+                const response = await fetch(`${API_BASE}/api/files/list`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                const fileListDiv = document.getElementById('file-list');
+                fileListDiv.innerHTML = '';
+                
+                if (data.files.length === 0) {
+                    fileListDiv.innerHTML = '<p class="info-text">No files found</p>';
+                    return;
+                }
+                
+                const ul = document.createElement('ul');
+                ul.className = 'file-list';
+                
+                data.files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file;
+                    ul.appendChild(li);
+                });
+                
+                fileListDiv.appendChild(ul);
+            } catch (error) {
+                showStatus('Error listing files: ' + error.message, 'error');
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString();
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '-';
+            if (seconds < 60) return `${seconds.toFixed(1)}s`;
+            return `${(seconds / 60).toFixed(1)}m`;
+        }
+
+        // Data Catalog Functions
+        let currentCatalog = null;
+        let currentTableLayer = null;
+        let currentTableName = null;
+
+        async function loadCatalog() {
+            try {
+                const response = await fetch(`${API_BASE}/api/data/catalog`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                currentCatalog = data.schemas;
+                renderCatalogTree(data.schemas);
+            } catch (error) {
+                showStatus('Error loading catalog: ' + error.message, 'error');
+            }
+        }
+
+        function renderCatalogTree(schemas) {
+            const treeContent = document.getElementById('catalog-tree-content');
+            treeContent.innerHTML = '';
+            
+            const layers = ['bronze', 'silver', 'gold'];
+            
+            layers.forEach(layer => {
+                const tables = schemas[layer] || [];
+                
+                const layerDiv = document.createElement('div');
+                layerDiv.className = 'tree-layer';
+                
+                const layerHeader = document.createElement('div');
+                layerHeader.className = 'tree-layer-header';
+                layerHeader.innerHTML = `<span class="tree-icon">▼</span>${layer} (${tables.length})`;
+                layerHeader.onclick = () => toggleLayer(layer);
+                
+                const tablesList = document.createElement('div');
+                tablesList.className = 'tree-tables';
+                tablesList.id = `layer-${layer}`;
+                
+                tables.forEach(table => {
+                    const tableItem = document.createElement('div');
+                    tableItem.className = 'tree-table-item';
+                    tableItem.innerHTML = `${table.name}`;
+                    tableItem.onclick = () => selectTable(layer, table.name);
+                    tablesList.appendChild(tableItem);
+                });
+                
+                layerDiv.appendChild(layerHeader);
+                layerDiv.appendChild(tablesList);
+                treeContent.appendChild(layerDiv);
+            });
+        }
+
+        function toggleLayer(layer) {
+            const tablesList = document.getElementById(`layer-${layer}`);
+            const header = tablesList.previousElementSibling;
+            const icon = header.querySelector('.tree-icon');
+            
+            if (tablesList.style.display === 'none') {
+                tablesList.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                tablesList.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        async function selectTable(layer, tableName) {
+            currentTableLayer = layer;
+            currentTableName = tableName;
+            
+            // Highlight selected table
+            document.querySelectorAll('.tree-table-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Load table metadata and preview
+            await loadTableMetadata(layer, tableName);
+            await loadTablePreview(layer, tableName);
+        }
+
+        async function loadTableMetadata(layer, tableName) {
+            try {
+                const response = await fetch(`${API_BASE}/api/data/table/${layer}/${tableName}`, {
+                    headers: getHeaders()
+                });
+                const metadata = await response.json();
+                
+                renderTableMetadata(layer, tableName, metadata);
+            } catch (error) {
+                showStatus('Error loading table metadata: ' + error.message, 'error');
+            }
+        }
+
+        function renderTableMetadata(layer, tableName, metadata) {
+            const tableInfo = document.getElementById('table-info');
+            
+            let html = `
+                <div class="table-header-compact">
+                    <h3>${layer}.${tableName}</h3>
+                    <div class="table-stats">
+                        <span class="stat-badge">Version: ${metadata.version}</span>
+                        <span class="stat-badge">Rows: ${metadata.row_count !== null ? metadata.row_count.toLocaleString() : 'N/A'}</span>
+                        <span class="stat-badge">Columns: ${metadata.num_fields}</span>
+                    </div>
+                </div>
+                
+                <div class="table-detail-tabs">
+                    <button class="table-tab-button active" onclick="showTableTab('schema')">Schema</button>
+                    <button class="table-tab-button" onclick="showTableTab('preview')">Data Preview</button>
+                </div>
+                
+                <div id="schema-tab-content" class="table-tab-content active">
+                    <div class="schema-section">
+                        <table class="schema-table">
+                            <thead>
+                                <tr>
+                                    <th>Column Name</th>
+                                    <th>Data Type</th>
+                                    <th>Nullable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            metadata.fields.forEach(field => {
+                html += `
+                    <tr>
+                        <td><strong>${field.name}</strong></td>
+                        <td><code>${field.type}</code></td>
+                        <td>${field.nullable ? '✓' : '✗'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div id="preview-tab-content" class="table-tab-content">
+                    <div id="preview-data" class="preview-data">
+                        <p class="info-text">Loading preview...</p>
+                    </div>
+                </div>
+            `;
+            
+            tableInfo.innerHTML = html;
+            
+            // Populate the controls panel
+            const tableControls = document.getElementById('table-controls');
+            const controlsHtml = `
+                <h3>Table Controls</h3>
+                <div class="controls-section">
+                    <h4>Filter</h4>
+                    <div class="control-group">
+                        <label>Column</label>
+                        <select id="filterColumn">
+                            <option value="">Select column...</option>
+                            ${metadata.fields.map(f => `<option value="${f.name}">${f.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Operator</label>
+                        <select id="filterOperator">
+                            <option value="=">=</option>
+                            <option value="!=">!=</option>
+                            <option value="contains">contains</option>
+                            <option value=">">></option>
+                            <option value="<"><</option>
+                            <option value=">=">>=</option>
+                            <option value="<="><=</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Value</label>
+                        <input type="text" id="filterValue" placeholder="Value" />
+                    </div>
+                    <div class="control-buttons">
+                        <button onclick="applyFilter()" class="btn btn-small btn-primary">Apply Filter</button>
+                        <button onclick="clearFilter()" class="btn btn-small btn-secondary">Clear</button>
+                    </div>
+                </div>
+                <div class="controls-section">
+                    <h4>Sort</h4>
+                    <div class="control-group">
+                        <label>Column</label>
+                        <select id="sortColumn">
+                            <option value="">Select column...</option>
+                            ${metadata.fields.map(f => `<option value="${f.name}">${f.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Order</label>
+                        <select id="sortOrder">
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
+                        </select>
+                    </div>
+                    <div class="control-buttons">
+                        <button onclick="applySort()" class="btn btn-small btn-primary">Apply Sort</button>
+                    </div>
+                </div>
+            `;
+            tableControls.innerHTML = controlsHtml;
+        }
+
+        async function loadTablePreview(layer, tableName, filters = null, sortBy = null, sortOrder = 'asc') {
+            try {
+                const requestBody = {
+                    limit: 100,
+                    filters: filters,
+                    sort_by: sortBy,
+                    sort_order: sortOrder
+                };
+                
+                const response = await fetch(`${API_BASE}/api/data/preview/${layer}/${tableName}`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+                
+                const previewData = await response.json();
+                
+                renderTablePreview(previewData);
+            } catch (error) {
+                console.error('Table preview error:', error);
+                showStatus('Error loading table preview: ' + error.message, 'error');
+                
+                // Try to show error in preview area if it exists
+                const previewDiv = document.getElementById('preview-data');
+                if (previewDiv) {
+                    previewDiv.innerHTML = `<p class="error-text">Error loading preview: ${error.message}</p>`;
+                }
+            }
+        }
+
+        function renderTablePreview(previewData) {
+            const previewDiv = document.getElementById('preview-data');
+            
+            if (!previewDiv) {
+                console.error('Preview data element not found');
+                showStatus('Error: Preview container not ready. Please try selecting the table again.', 'error');
+                return;
+            }
+            
+            if (previewData.data.length === 0) {
+                previewDiv.innerHTML = '<p class="info-text">No data found</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="preview-info">
+                    Showing ${previewData.preview_rows} of ${previewData.filtered_rows.toLocaleString()} rows 
+                    ${previewData.filtered_rows !== previewData.total_rows ? `(filtered from ${previewData.total_rows.toLocaleString()} total)` : ''}
+                </div>
+                <div class="preview-table-wrapper">
+                    <table class="preview-table">
+                        <thead>
+                            <tr>
+                                ${previewData.columns.map(col => `<th>${col}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            previewData.data.forEach(row => {
+                html += '<tr>';
+                previewData.columns.forEach(col => {
+                    const value = row[col];
+                    const displayValue = value !== null && value !== undefined ? value : '<i>null</i>';
+                    html += `<td>${displayValue}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            previewDiv.innerHTML = html;
+        }
+
+        function applyFilter() {
+            const column = document.getElementById('filterColumn').value;
+            const operator = document.getElementById('filterOperator').value;
+            const value = document.getElementById('filterValue').value;
+            
+            if (!column || !value) {
+                showStatus('Please enter column name and value', 'warning');
+                return;
+            }
+            
+            const filters = [{
+                column: column,
+                operator: operator,
+                value: value
+            }];
+            
+            const sortBy = document.getElementById('sortColumn').value || null;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            loadTablePreview(currentTableLayer, currentTableName, filters, sortBy, sortOrder);
+        }
+
+        function clearFilter() {
+            document.getElementById('filterColumn').value = '';
+            document.getElementById('filterValue').value = '';
+            
+            const sortBy = document.getElementById('sortColumn').value || null;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            loadTablePreview(currentTableLayer, currentTableName, null, sortBy, sortOrder);
+        }
+
+        function applySort() {
+            const sortBy = document.getElementById('sortColumn').value;
+            
+            if (!sortBy) {
+                showStatus('Please select a column to sort by', 'warning');
+                return;
+            }
+            
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            // Check if there's an active filter
+            const filterColumn = document.getElementById('filterColumn').value;
+            const filterValue = document.getElementById('filterValue').value;
+            let filters = null;
+            
+            if (filterColumn && filterValue) {
+                const operator = document.getElementById('filterOperator').value;
+                filters = [{
+                    column: filterColumn,
+                    operator: operator,
+                    value: filterValue
+                }];
+            }
+            
+            loadTablePreview(currentTableLayer, currentTableName, filters, sortBy, sortOrder);
+        }
+
+        function showTableTab(tabName) {
+            // Hide all table tab contents
+            document.querySelectorAll('.table-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all table tab buttons
+            document.querySelectorAll('.table-tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            const contentId = tabName === 'schema' ? 'schema-tab-content' : 'preview-tab-content';
+            const selectedContent = document.getElementById(contentId);
+            if (selectedContent) {
+                selectedContent.classList.add('active');
+            }
+            
+            // Activate selected tab button
+            event.target.classList.add('active');
+        }
+
+        // SQL Query Functions
+        let sqlCatalog = null;
+
+        async function loadSQLQueryTab() {
+            try {
+                const response = await fetch(`${API_BASE}/api/data/catalog`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                sqlCatalog = data.schemas;
+                renderSQLCatalogTree(data.schemas);
+            } catch (error) {
+                showStatus('Error loading catalog: ' + error.message, 'error');
+            }
+        }
+
+        function renderSQLCatalogTree(schemas) {
+            const treeContent = document.getElementById('sql-catalog-tree-content');
+            treeContent.innerHTML = '';
+            
+            const layers = ['bronze', 'silver', 'gold'];
+            
+            layers.forEach(layer => {
+                const tables = schemas[layer] || [];
+                
+                const layerDiv = document.createElement('div');
+                layerDiv.className = 'tree-layer';
+                
+                const layerHeader = document.createElement('div');
+                layerHeader.className = 'tree-layer-header';
+                layerHeader.innerHTML = `<span class="tree-icon">▼</span>${layer} (${tables.length})`;
+                layerHeader.onclick = () => toggleSQLLayer(layer);
+                
+                const tablesList = document.createElement('div');
+                tablesList.className = 'tree-tables';
+                tablesList.id = `sql-layer-${layer}`;
+                
+                tables.forEach(table => {
+                    const tableItem = document.createElement('div');
+                    tableItem.className = 'tree-table-item';
+                    tableItem.innerHTML = `${table.name}`;
+                    tableItem.onclick = () => insertTableName(layer, table.name);
+                    tableItem.title = `Click to insert ${layer}_${table.name} into query`;
+                    tablesList.appendChild(tableItem);
+                });
+                
+                layerDiv.appendChild(layerHeader);
+                layerDiv.appendChild(tablesList);
+                treeContent.appendChild(layerDiv);
+            });
+        }
+
+        function toggleSQLLayer(layer) {
+            const tablesList = document.getElementById(`sql-layer-${layer}`);
+            const header = tablesList.previousElementSibling;
+            const icon = header.querySelector('.tree-icon');
+            
+            if (tablesList.style.display === 'none') {
+                tablesList.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                tablesList.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+
+        function insertTableName(layer, tableName) {
+            const editor = document.getElementById('sql-editor');
+            const fullTableName = `${layer}_${tableName}`;
+            
+            // Get cursor position
+            const cursorPos = editor.selectionStart;
+            const textBefore = editor.value.substring(0, cursorPos);
+            const textAfter = editor.value.substring(cursorPos);
+            
+            // Insert table name at cursor
+            editor.value = textBefore + fullTableName + textAfter;
+            
+            // Move cursor after inserted text
+            const newCursorPos = cursorPos + fullTableName.length;
+            editor.setSelectionRange(newCursorPos, newCursorPos);
+            editor.focus();
+            
+            showStatus(`Inserted ${fullTableName} into query`, 'success');
+        }
+
+        function clearSQLEditor() {
+            document.getElementById('sql-editor').value = '';
+            document.getElementById('sql-results-content').innerHTML = '<p class="info-text">Run a query to see results</p>';
+            document.getElementById('sql-results-info').textContent = '';
+            document.getElementById('sql-query-info').textContent = '';
+        }
+
+        async function runSQLQuery() {
+            const editor = document.getElementById('sql-editor');
+            const sqlQuery = editor.value.trim();
+            
+            if (!sqlQuery) {
+                showStatus('Please enter a SQL query', 'warning');
+                return;
+            }
+            
+            const resultsContent = document.getElementById('sql-results-content');
+            const resultsInfo = document.getElementById('sql-results-info');
+            
+            // Show loading state
+            resultsContent.innerHTML = '<p class="info-text">Executing query...</p>';
+            resultsInfo.textContent = '';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/data/query`, {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify({
+                        sql: sqlQuery,
+                        limit: 1000
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Query execution failed');
+                }
+                
+                renderQueryResults(data);
+                showStatus(`Query executed successfully (${data.row_count} rows in ${data.execution_time_ms}ms)`, 'success');
+            } catch (error) {
+                resultsContent.innerHTML = `<p class="error-text">Error: ${error.message}</p>`;
+                showStatus('Query failed: ' + error.message, 'error');
+            }
+        }
+
+        function renderQueryResults(queryData) {
+            const resultsContent = document.getElementById('sql-results-content');
+            const resultsInfo = document.getElementById('sql-results-info');
+            
+            if (!queryData.data || queryData.data.length === 0) {
+                resultsContent.innerHTML = '<p class="info-text">Query returned no results</p>';
+                resultsInfo.textContent = '0 rows';
+                return;
+            }
+            
+            // Update info
+            const limitNote = queryData.row_count > 1000 ? ' (limited to 1000)' : '';
+            resultsInfo.textContent = `${queryData.row_count} rows in ${queryData.execution_time_ms}ms${limitNote}`;
+            
+            // Build results table
+            let html = `
+                <div class="preview-table-wrapper">
+                    <table class="query-results-table">
+                        <thead>
+                            <tr>
+                                ${queryData.columns.map(col => `<th>${col}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            queryData.data.forEach(row => {
+                html += '<tr>';
+                queryData.columns.forEach(col => {
+                    const value = row[col];
+                    const displayValue = value !== null && value !== undefined ? value : '<i>null</i>';
+                    html += `<td>${displayValue}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            resultsContent.innerHTML = html;
+        }
+
+        // Load pipelines on page load only if API key is set
+        window.addEventListener('load', () => {
+            if (apiKey && apiKey !== '') {
+                loadPipelines();
+            } else {
+                showStatus('Please enter your API key to begin', 'info');
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' || event.key === 'Esc') {
+                const modal = document.getElementById('job-modal');
+                if (modal && modal.classList.contains('active')) {
+                    closeJobModal();
+                }
+            }
+            
+            // Ctrl+Enter to run SQL query
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                const sqlTab = document.getElementById('sql');
+                if (sqlTab && sqlTab.classList.contains('active')) {
+                    event.preventDefault();
+                    runSQLQuery();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
