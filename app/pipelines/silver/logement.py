@@ -6,7 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="silver", name="logement", dependencies=["bronze.logement"])
+@register_pipeline(
+    layer="silver", 
+    name="logement", 
+    dependencies=["bronze.logement"],
+    description_fr="Données de prix et statistiques du logement par commune. Inclut les loyers moyens, bornes de prédiction et niveaux de qualité des estimations."
+)
 class SilverLogementPipeline(SQLSilverPipeline):
     """Transform logement (housing) data for silver layer using SQL."""
     

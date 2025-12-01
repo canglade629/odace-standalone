@@ -63,6 +63,7 @@ class PipelineInfo(BaseModel):
     name: str
     layer: PipelineLayer
     description: Optional[str] = None
+    description_fr: Optional[str] = None
     dependencies: List[str] = Field(default_factory=list)
 
 

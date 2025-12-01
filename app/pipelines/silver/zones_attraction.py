@@ -6,7 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="silver", name="zones_attraction", dependencies=["bronze.zones_attraction", "silver.geo"])
+@register_pipeline(
+    layer="silver", 
+    name="zones_attraction", 
+    dependencies=["bronze.zones_attraction", "silver.geo"],
+    description_fr="Aires d'attraction des villes 2020. Définis les zones d'influence économique des pôles urbains et leurs communes rattachées."
+)
 class SilverZonesAttractionPipeline(SQLSilverPipeline):
     """Transform zones attraction data with complex text processing and joins using SQL."""
     

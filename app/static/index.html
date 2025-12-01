@@ -6,6 +6,10 @@
     <title>Odace Data Pipeline</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/style.css">
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Mermaid.js for diagram rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -21,14 +25,31 @@
         </div>
 
         <nav class="tabs">
-            <button class="tab-button active" onclick="showTab('pipelines')">Pipelines</button>
+            <button class="tab-button active" onclick="showTab('catalogue')">Catalogue</button>
+            <button class="tab-button" onclick="showTab('pipelines')">Pipelines</button>
             <button class="tab-button" onclick="showTab('history')">History</button>
             <button class="tab-button" onclick="showTab('files')">Files</button>
             <button class="tab-button" onclick="showTab('data')">Data</button>
             <button class="tab-button" onclick="showTab('sql')">SQL Query</button>
+            <button class="tab-button" onclick="showTab('doc')">Doc</button>
         </nav>
 
-        <div id="pipelines" class="tab-content active">
+        <div id="catalogue" class="tab-content active">
+            <div class="catalog-header">
+                <h2>Catalogue des Tables Silver</h2>
+                <button onclick="loadSilverCatalog()" class="btn-icon" title="Rafraîchir le catalogue">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="silver-catalog-grid" class="pipeline-grid">
+                <p class="info-text">Chargement du catalogue...</p>
+            </div>
+        </div>
+
+        <div id="pipelines" class="tab-content">
             <h2>Run Pipelines</h2>
             
             <div class="pipeline-section">
@@ -184,6 +205,21 @@
             </div>
         </div>
 
+        <div id="doc" class="tab-content">
+            <div class="catalog-header">
+                <h2>Data Model Documentation</h2>
+                <button onclick="loadDocumentation()" class="btn-icon" title="Refresh documentation">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="doc-content" class="doc-content">
+                <p class="info-text">Loading documentation...</p>
+            </div>
+        </div>
+
         <div id="status" class="status-message"></div>
     </div>
 
@@ -196,6 +232,19 @@
             </div>
             <div class="modal-body" id="modal-body">
                 <div class="loading-tasks">Loading tasks...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Table Details Modal -->
+    <div id="catalog-modal" class="modal-overlay" onclick="closeCatalogModal()">
+        <div class="modal-container modal-large" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="catalog-modal-title">Détails de la Table</h3>
+                <button class="modal-close-btn" onclick="closeCatalogModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="catalog-modal-body">
+                <div class="loading-tasks">Chargement des détails...</div>
             </div>
         </div>
     </div>
@@ -257,6 +306,10 @@
                 loadCatalog();
             } else if (tabName === 'sql') {
                 loadSQLQueryTab();
+            } else if (tabName === 'doc') {
+                loadDocumentation();
+            } else if (tabName === 'catalogue') {
+                loadSilverCatalog();
             }
         }
 
@@ -1247,10 +1300,248 @@
             resultsContent.innerHTML = html;
         }
 
-        // Load pipelines on page load only if API key is set
+        // Silver Catalog Functions
+        async function loadSilverCatalog() {
+            try {
+                const gridDiv = document.getElementById('silver-catalog-grid');
+                gridDiv.innerHTML = '<p class="info-text">Chargement du catalogue...</p>';
+                
+                const response = await fetch(`${API_BASE}/api/data/catalog/silver`, {
+                    headers: getHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                renderSilverCatalogCards(data.tables);
+            } catch (error) {
+                showStatus('Erreur lors du chargement du catalogue: ' + error.message, 'error');
+                const gridDiv = document.getElementById('silver-catalog-grid');
+                gridDiv.innerHTML = '<p class="error-text">Erreur lors du chargement du catalogue</p>';
+            }
+        }
+
+        function renderSilverCatalogCards(tables) {
+            const gridDiv = document.getElementById('silver-catalog-grid');
+            gridDiv.innerHTML = '';
+            
+            if (!tables || tables.length === 0) {
+                gridDiv.innerHTML = '<p class="info-text">Aucune table disponible</p>';
+                return;
+            }
+            
+            tables.forEach(table => {
+                const card = document.createElement('div');
+                card.className = 'pipeline-card catalog-card';
+                card.onclick = () => showTableDetail(table.name);
+                
+                let dependenciesHtml = '';
+                if (table.dependencies && table.dependencies.length > 0) {
+                    dependenciesHtml = `
+                        <div class="card-dependencies">
+                            <small>Dépendances: ${table.dependencies.join(', ')}</small>
+                        </div>
+                    `;
+                }
+                
+                let metadataHtml = '';
+                if (table.row_count !== null && table.row_count !== undefined) {
+                    metadataHtml = `
+                        <div class="card-metadata">
+                            <span class="metadata-badge">${table.row_count.toLocaleString()} lignes</span>
+                            <span class="metadata-badge">v${table.version}</span>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <h4>${table.name}</h4>
+                    <p class="table-description-fr">${table.description_fr}</p>
+                    ${dependenciesHtml}
+                    ${metadataHtml}
+                `;
+                
+                gridDiv.appendChild(card);
+            });
+        }
+
+        async function showTableDetail(tableName) {
+            const modal = document.getElementById('catalog-modal');
+            const modalTitle = document.getElementById('catalog-modal-title');
+            const modalBody = document.getElementById('catalog-modal-body');
+            
+            // Show modal
+            modal.classList.add('active');
+            modalTitle.textContent = `Table: ${tableName}`;
+            modalBody.innerHTML = '<div class="loading-tasks">Chargement des détails...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/data/catalog/silver/${tableName}`, {
+                    headers: getHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                renderTableDetail(data);
+            } catch (error) {
+                modalBody.innerHTML = `<p class="error-text">Erreur: ${error.message}</p>`;
+                showStatus('Erreur lors du chargement des détails: ' + error.message, 'error');
+            }
+        }
+
+        function renderTableDetail(tableData) {
+            const modalBody = document.getElementById('catalog-modal-body');
+            
+            // Dependencies section
+            let dependenciesHtml = '';
+            if (tableData.dependencies && tableData.dependencies.length > 0) {
+                dependenciesHtml = `
+                    <div class="modal-section">
+                        <h4>Dépendances</h4>
+                        <ul class="dependencies-list">
+                            ${tableData.dependencies.map(dep => `<li><code>${dep}</code></li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            // Schema section
+            let schemaHtml = `
+                <div class="modal-section">
+                    <h4>Schéma (${tableData.schema.num_fields} colonnes, ${tableData.schema.row_count ? tableData.schema.row_count.toLocaleString() + ' lignes' : 'N/A'})</h4>
+                    <div class="schema-table-wrapper">
+                        <table class="schema-table">
+                            <thead>
+                                <tr>
+                                    <th>Colonne</th>
+                                    <th>Type</th>
+                                    <th>Nullable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableData.schema.fields.map(field => `
+                                    <tr>
+                                        <td><strong>${field.name}</strong></td>
+                                        <td><code>${field.type}</code></td>
+                                        <td>${field.nullable ? '✓' : '✗'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            // Preview section
+            let previewHtml = '';
+            if (tableData.preview && tableData.preview.length > 0) {
+                const columns = Object.keys(tableData.preview[0]);
+                previewHtml = `
+                    <div class="modal-section">
+                        <h4>Aperçu des Données (10 premières lignes)</h4>
+                        <div class="preview-table-wrapper">
+                            <table class="preview-table">
+                                <thead>
+                                    <tr>
+                                        ${columns.map(col => `<th>${col}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableData.preview.map(row => `
+                                        <tr>
+                                            ${columns.map(col => {
+                                                const value = row[col];
+                                                const displayValue = value !== null && value !== undefined ? value : '<i>null</i>';
+                                                return `<td>${displayValue}</td>`;
+                                            }).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <div class="table-detail-header">
+                    <h3>${tableData.name}</h3>
+                    <p class="table-description-fr">${tableData.description_fr}</p>
+                </div>
+                ${dependenciesHtml}
+                ${schemaHtml}
+                ${previewHtml}
+            `;
+            
+            modalBody.innerHTML = html;
+        }
+
+        function closeCatalogModal() {
+            const modal = document.getElementById('catalog-modal');
+            modal.classList.remove('active');
+        }
+
+        // Documentation Functions
+        async function loadDocumentation() {
+            try {
+                const docContent = document.getElementById('doc-content');
+                docContent.innerHTML = '<p class="info-text">Loading documentation...</p>';
+                
+                const response = await fetch(`${API_BASE}/api/docs/data-model`, {
+                    headers: getHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const markdownText = await response.text();
+                
+                // Initialize mermaid
+                mermaid.initialize({ 
+                    startOnLoad: false,
+                    theme: 'default',
+                    securityLevel: 'loose'
+                });
+                
+                // Parse markdown to HTML
+                const htmlContent = marked.parse(markdownText);
+                docContent.innerHTML = htmlContent;
+                
+                // Render mermaid diagrams
+                const mermaidDivs = docContent.querySelectorAll('code.language-mermaid');
+                mermaidDivs.forEach((element, index) => {
+                    const mermaidCode = element.textContent;
+                    const mermaidDiv = document.createElement('div');
+                    mermaidDiv.className = 'mermaid';
+                    mermaidDiv.textContent = mermaidCode;
+                    element.parentElement.replaceWith(mermaidDiv);
+                });
+                
+                // Render all mermaid diagrams
+                await mermaid.run({
+                    querySelector: '.mermaid'
+                });
+                
+                showStatus('Documentation loaded successfully', 'success');
+            } catch (error) {
+                const docContent = document.getElementById('doc-content');
+                docContent.innerHTML = `<p class="error-text">Error loading documentation: ${error.message}</p>`;
+                showStatus('Error loading documentation: ' + error.message, 'error');
+            }
+        }
+
+        // Load catalog on page load only if API key is set
         window.addEventListener('load', () => {
             if (apiKey && apiKey !== '') {
-                loadPipelines();
+                loadSilverCatalog();
             } else {
                 showStatus('Please enter your API key to begin', 'info');
             }
@@ -1259,9 +1550,14 @@
         // Close modal on Escape key
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' || event.key === 'Esc') {
-                const modal = document.getElementById('job-modal');
-                if (modal && modal.classList.contains('active')) {
+                const jobModal = document.getElementById('job-modal');
+                if (jobModal && jobModal.classList.contains('active')) {
                     closeJobModal();
+                }
+                
+                const catalogModal = document.getElementById('catalog-modal');
+                if (catalogModal && catalogModal.classList.contains('active')) {
+                    closeCatalogModal();
                 }
             }
             

@@ -10,6 +10,8 @@ from app.core.config import get_settings
 from app.utils.delta_ops import DeltaOperations
 from app.utils.sql_executor import SQLExecutor
 from app.core.rate_limiter import limiter
+from app.core.pipeline_registry import get_registry
+from app.core.models import PipelineLayer
 from fastapi import Request
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,29 @@ class QueryResponse(BaseModel):
     execution_time_ms: float
 
 
+class SilverTableInfo(BaseModel):
+    """Silver table information with French description."""
+    name: str
+    description_fr: str
+    dependencies: List[str]
+    version: int
+    row_count: Optional[int]
+
+
+class SilverCatalogResponse(BaseModel):
+    """Catalog response for silver tables only."""
+    tables: List[SilverTableInfo]
+
+
+class SilverTableDetail(BaseModel):
+    """Detailed information about a silver table."""
+    name: str
+    description_fr: str
+    dependencies: List[str]
+    schema: TableSchema
+    preview: List[Dict[str, Any]]
+
+
 @router.get("/catalog", response_model=CatalogResponse)
 @limiter.limit("30/minute")
 async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
@@ -114,6 +139,126 @@ async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
     except Exception as e:
         logger.error(f"Error fetching catalog: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch catalog: {str(e)}")
+
+
+@router.get("/catalog/silver", response_model=SilverCatalogResponse)
+@limiter.limit("30/minute")
+async def get_silver_catalog(request: Request, api_key: str = Depends(verify_api_key)):
+    """
+    Get catalog of silver tables with French descriptions.
+    
+    Returns all silver layer tables with their French descriptions, dependencies,
+    and basic metadata.
+    """
+    logger.info("Fetching silver catalog with French descriptions")
+    settings = get_settings()
+    registry = get_registry()
+    
+    try:
+        # Get all silver pipelines from registry
+        silver_pipelines = registry.list_pipelines(layer=PipelineLayer.SILVER)
+        
+        # Get Delta table information
+        layer_path = f"{settings.delta_path}/silver"
+        delta_tables = {t["name"]: t for t in DeltaOperations.list_delta_tables(layer_path)}
+        
+        tables = []
+        for pipeline in silver_pipelines:
+            table_name = pipeline.name
+            delta_info = delta_tables.get(table_name, {})
+            
+            # Get row count if available
+            row_count = None
+            try:
+                table_path = f"{layer_path}/{table_name}"
+                schema_info = DeltaOperations.get_table_schema(table_path)
+                row_count = schema_info.get("row_count")
+            except Exception as e:
+                logger.warning(f"Could not get row count for {table_name}: {e}")
+            
+            tables.append(SilverTableInfo(
+                name=table_name,
+                description_fr=pipeline.description_fr or "Description non disponible",
+                dependencies=pipeline.dependencies,
+                version=delta_info.get("version", 0),
+                row_count=row_count
+            ))
+        
+        return SilverCatalogResponse(tables=tables)
+    
+    except Exception as e:
+        logger.error(f"Error fetching silver catalog: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch silver catalog: {str(e)}")
+
+
+@router.get("/catalog/silver/{table_name}", response_model=SilverTableDetail)
+@limiter.limit("30/minute")
+async def get_silver_table_detail(
+    request: Request,
+    table_name: str,
+    api_key: str = Depends(verify_api_key)
+):
+    """
+    Get detailed information about a specific silver table.
+    
+    Returns table metadata, schema, French description, dependencies,
+    and first 10 rows of data.
+    
+    Args:
+        table_name: Name of the silver table
+    """
+    logger.info(f"Fetching details for silver.{table_name}")
+    settings = get_settings()
+    registry = get_registry()
+    
+    try:
+        # Get pipeline info from registry
+        silver_pipelines = registry.list_pipelines(layer=PipelineLayer.SILVER)
+        pipeline_info = next((p for p in silver_pipelines if p.name == table_name), None)
+        
+        if not pipeline_info:
+            raise HTTPException(status_code=404, detail=f"Table {table_name} not found in registry")
+        
+        # Get table schema
+        table_path = f"{settings.delta_path}/silver/{table_name}"
+        schema_info = DeltaOperations.get_table_schema(table_path)
+        
+        table_schema = TableSchema(
+            fields=[
+                SchemaField(
+                    name=field["name"],
+                    type=field["type"],
+                    nullable=field["nullable"]
+                )
+                for field in schema_info["fields"]
+            ],
+            version=schema_info["version"],
+            row_count=schema_info["row_count"],
+            num_fields=schema_info["num_fields"]
+        )
+        
+        # Get first 10 rows
+        preview_data = DeltaOperations.preview_table(
+            table_path=table_path,
+            limit=10,
+            filters=None,
+            sort_by=None,
+            sort_order="asc"
+        )
+        
+        return SilverTableDetail(
+            name=table_name,
+            description_fr=pipeline_info.description_fr or "Description non disponible",
+            dependencies=pipeline_info.dependencies,
+            schema=table_schema,
+            preview=preview_data["data"]
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching table detail: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch table detail: {str(e)}")
 
 
 @router.get("/table/{layer}/{table}", response_model=TableSchema)

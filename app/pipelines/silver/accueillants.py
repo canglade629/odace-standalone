@@ -6,7 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="silver", name="accueillants", dependencies=["bronze.accueillants"])
+@register_pipeline(
+    layer="silver", 
+    name="accueillants", 
+    dependencies=["bronze.accueillants"],
+    description_fr="Localisation des structures d'accueil et organisations hôtes. Contient les adresses, coordonnées GPS et statuts des établissements accueillants."
+)
 class SilverAccueillantsPipeline(SQLSilverPipeline):
     """Transform accueillants data for silver layer using SQL."""
     

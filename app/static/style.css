@@ -1389,3 +1389,289 @@ button, .btn {
     }
     
 }
+
+/* Catalog Cards Styling */
+.catalog-card {
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.catalog-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.catalog-card .table-description-fr {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    min-height: 60px;
+    line-height: 1.4;
+}
+
+.card-dependencies {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.card-dependencies small {
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+}
+
+.card-metadata {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.metadata-badge {
+    background: var(--info-light);
+    color: var(--info);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Catalog Modal Styling */
+.modal-large {
+    max-width: 1200px;
+    max-height: 85vh;
+}
+
+.table-detail-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.table-detail-header h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.table-detail-header .table-description-fr {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.modal-section {
+    margin-bottom: 25px;
+}
+
+.modal-section h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.dependencies-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.dependencies-list li {
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--primary);
+    margin-bottom: 6px;
+    border-radius: 3px;
+}
+
+.dependencies-list code {
+    background: transparent;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.schema-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Documentation Styles */
+.doc-content {
+    background: var(--bg-secondary);
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    max-width: 1200px;
+    margin: 0 auto;
+    line-height: 1.8;
+}
+
+.doc-content h1 {
+    color: var(--text-primary);
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 3px solid var(--primary);
+}
+
+.doc-content h2 {
+    color: var(--text-primary);
+    font-size: 2rem;
+    font-weight: 600;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.doc-content h3 {
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.doc-content h4 {
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+}
+
+.doc-content p {
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+}
+
+.doc-content ul, .doc-content ol {
+    margin-bottom: 1.5rem;
+    padding-left: 2rem;
+}
+
+.doc-content li {
+    margin-bottom: 0.5rem;
+}
+
+.doc-content code {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+    color: var(--error);
+}
+
+.doc-content pre {
+    background: var(--bg-tertiary);
+    padding: 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--primary);
+}
+
+.doc-content pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-primary);
+}
+
+.doc-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+}
+
+.doc-content table th {
+    background: var(--bg-tertiary);
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.doc-content table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.doc-content table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.doc-content blockquote {
+    border-left: 4px solid var(--info);
+    padding-left: 20px;
+    margin: 1.5rem 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.doc-content a {
+    color: var(--info);
+    text-decoration: none;
+}
+
+.doc-content a:hover {
+    text-decoration: underline;
+}
+
+/* Mermaid diagram container */
+.doc-content .mermaid {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 2rem 0;
+    display: flex;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+}
+
+/* Horizontal rule */
+.doc-content hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 3rem 0;
+}
+
+/* Responsive doc content */
+@media (max-width: 768px) {
+    .doc-content {
+        padding: 20px;
+    }
+    
+    .doc-content h1 {
+        font-size: 2rem;
+    }
+    
+    .doc-content h2 {
+        font-size: 1.5rem;
+    }
+    
+    .doc-content pre {
+        padding: 15px;
+    }
+    
+    .doc-content table {
+        font-size: 0.85rem;
+    }
+    
+    .doc-content table th,
+    .doc-content table td {
+        padding: 8px 10px;
+    }
+}
+

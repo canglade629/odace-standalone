@@ -16,13 +16,15 @@ class PipelineRegistry:
             "gold": {}
         }
         self._dependencies: Dict[str, List[str]] = {}
+        self._descriptions_fr: Dict[str, str] = {}
     
     def register(
         self,
         layer: PipelineLayer,
         name: str,
         pipeline_class: Type,
-        dependencies: Optional[List[str]] = None
+        dependencies: Optional[List[str]] = None,
+        description_fr: Optional[str] = None
     ):
         """
         Register a pipeline.
@@ -32,6 +34,7 @@ class PipelineRegistry:
             name: Pipeline name
             pipeline_class: Pipeline class
             dependencies: List of pipeline names this pipeline depends on
+            description_fr: French description of the pipeline
         """
         layer_str = layer.value if isinstance(layer, PipelineLayer) else layer
         
@@ -43,6 +46,10 @@ class PipelineRegistry:
         # Store dependencies
         full_name = f"{layer_str}.{name}"
         self._dependencies[full_name] = dependencies or []
+        
+        # Store French description
+        if description_fr:
+            self._descriptions_fr[full_name] = description_fr
         
         logger.info(f"Registered pipeline: {full_name}")
     
@@ -85,6 +92,7 @@ class PipelineRegistry:
                     name=name,
                     layer=PipelineLayer(layer_name),
                     description=description,
+                    description_fr=self._descriptions_fr.get(full_name),
                     dependencies=self._dependencies.get(full_name, [])
                 ))
         
@@ -115,7 +123,7 @@ def get_registry() -> PipelineRegistry:
     return _registry
 
 
-def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] = None):
+def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] = None, description_fr: Optional[str] = None):
     """
     Decorator to register a pipeline class.
     
@@ -123,6 +131,7 @@ def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] =
         layer: Pipeline layer (bronze/silver/gold)
         name: Pipeline name
         dependencies: List of pipeline names this depends on (format: "layer.name")
+        description_fr: French description of the pipeline
         
     Example:
         @register_pipeline(layer="bronze", name="accueillants")
@@ -130,7 +139,7 @@ def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] =
             pass
     """
     def decorator(cls):
-        _registry.register(layer, name, cls, dependencies)
+        _registry.register(layer, name, cls, dependencies, description_fr)
         return cls
     return decorator
 

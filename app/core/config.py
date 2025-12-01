@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Application settings
     log_level: str = "INFO"
     
+    # SIAE API Configuration
+    siae_api_base_url: str = "https://emplois.inclusion.beta.gouv.fr/api/v1"
+    siae_api_rate_limit: int = 12  # requests per minute
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

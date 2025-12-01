@@ -337,6 +337,8 @@ https://odace-pipeline-588398598428.europe-west1.run.app/docs
 - `gares` - Train station data
 - `lignes` - Train line data
 - `zones_attraction` - Urban attraction zones
+- `siae_structures` - Social inclusion employment structures (API source)
+- `siae_postes` - Job positions in social inclusion structures (API source)
 
 ### Silver Layer (Data Transformation)
 - `accueillants` - Cleaned host data
@@ -345,6 +347,8 @@ https://odace-pipeline-588398598428.europe-west1.run.app/docs
 - `lignes` - Deduplicated line data
 - `logement` - Standardized housing data
 - `zones_attraction` - Processed attraction zones
+- `siae_structures` - Cleaned SIAE structures with INSEE codes
+- `siae_postes` - Standardized job positions with geographic context
 
 ## Response Formats
 
@@ -376,10 +380,99 @@ For questions or issues:
 - Review the interactive API docs at `/docs`
 - Contact your data team administrator
 
+## SIAE Data Integration
+
+The Odace pipeline now includes data from the **emplois.inclusion.beta.gouv.fr** API, providing social inclusion employment structure data.
+
+### What is SIAE Data?
+
+SIAE (Structures d'Insertion par l'Activité Économique) are French organizations that provide employment opportunities to people facing social and professional difficulties. The data includes:
+
+- **Structures**: Companies and organizations offering inclusive employment
+  - SIRET numbers, legal names, addresses
+  - Contact information (phone, email, website)
+  - Geographic location (city, postal code, department)
+  - Structure types (EI, AI, ETTI, etc.)
+
+- **Job Positions (Postes)**: Active job openings within these structures
+  - Job classifications (ROME codes)
+  - Contract types and number of positions
+  - Recruitment status
+  - Geographic context linked from structures
+
+### Data Sources
+
+- **API**: `https://emplois.inclusion.beta.gouv.fr/api/v1/siaes/`
+- **Update Frequency**: Daily via API (rate limited: 12 requests/minute)
+- **Coverage**: All French departments (metropolitan and overseas)
+- **Estimated Volume**: 5,000-10,000 structures, 10,000-30,000 job positions
+
+### Integration with Existing Data
+
+SIAE data can be joined with other datasets:
+
+1. **With `geo` data**: Via city names and postal codes
+   - Silver layer enriches SIAE structures with INSEE codes
+   - Enables commune-level analysis
+
+2. **With `accueillants` data**: Similar location-based structures
+   - Compare host locations with employment opportunities
+   - Spatial proximity analysis
+
+3. **With `logement` data**: Housing accessibility analysis
+   - Link housing availability to SIAE job locations
+   - Affordability vs employment opportunity mapping
+
+4. **With `gares`/`lignes` data**: Public transport access
+   - Assess SIAE accessibility by public transport
+   - Commute time analysis
+
+### Example Queries
+
+**Find SIAE structures with their commune data:**
+```sql
+SELECT 
+    s.legal_name,
+    s.structure_type,
+    s.city,
+    s.postal_code,
+    s.insee_code,
+    s.standardized_city_name
+FROM silver_siae_structures s
+WHERE s.accepting_applications = true
+```
+
+**Find active job positions by department:**
+```sql
+SELECT 
+    p.department,
+    p.structure_type,
+    COUNT(*) as active_positions,
+    SUM(p.positions_available) as total_openings
+FROM silver_siae_postes p
+WHERE p.is_recruiting = 'True'
+GROUP BY p.department, p.structure_type
+ORDER BY active_positions DESC
+```
+
+**Join SIAE with housing data:**
+```sql
+SELECT 
+    s.city,
+    s.insee_code,
+    COUNT(DISTINCT s.id) as siae_count,
+    AVG(l.some_housing_metric) as avg_housing_metric
+FROM silver_siae_structures s
+LEFT JOIN silver_geo g ON s.insee_code = g.CODGEO
+LEFT JOIN silver_logement l ON g.CODGEO = l.CODGEO
+GROUP BY s.city, s.insee_code
+```
+
 ## Additional Documentation
 
 For developers and administrators:
 - [API Key Management](docs/API_KEY_USAGE.md) - Complete guide to API key creation and management
+- [SIAE Data Exploration](SIAE_DATA_EXPLORATION.md) - Detailed SIAE data analysis and schema design
 - [Implementation Details](docs/IMPLEMENTATION_SUMMARY.md) - Technical architecture and design
 - [Pipeline Fixes](docs/PIPELINE_FIXES_SUMMARY.md) - Pipeline development notes
 - [Test Reports](docs/END_TO_END_TEST_REPORT.md) - Testing documentation

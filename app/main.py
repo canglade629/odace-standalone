@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import get_settings
 from app.core.models import HealthResponse
 from app.core.rate_limiter import limiter
-from app.api.routes import bronze, silver, gold, pipeline, files, data, jobs, admin
+from app.api.routes import bronze, silver, gold, pipeline, files, data, jobs, admin, docs
 
 # Configure logging
 logging.basicConfig(
@@ -26,12 +26,16 @@ import app.pipelines.bronze.geo
 import app.pipelines.bronze.logement
 import app.pipelines.bronze.transport
 import app.pipelines.bronze.zones_attraction
+import app.pipelines.bronze.siae_postes
+import app.pipelines.bronze.siae_structures
 import app.pipelines.silver.accueillants
 import app.pipelines.silver.geo
 import app.pipelines.silver.gares
 import app.pipelines.silver.lignes
 import app.pipelines.silver.logement
 import app.pipelines.silver.zones_attraction
+import app.pipelines.silver.siae_structures
+import app.pipelines.silver.siae_postes
 
 # Create FastAPI app
 app = FastAPI(
@@ -65,6 +69,7 @@ app.include_router(files.router)
 app.include_router(data.router)
 app.include_router(jobs.router)
 app.include_router(admin.router)
+app.include_router(docs.router)
 
 
 @app.get("/", response_class=HTMLResponse)

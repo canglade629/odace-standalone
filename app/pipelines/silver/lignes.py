@@ -6,7 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="silver", name="lignes", dependencies=["bronze.lignes"])
+@register_pipeline(
+    layer="silver", 
+    name="lignes", 
+    dependencies=["bronze.lignes"],
+    description_fr="Référentiel des lignes ferroviaires françaises. Inclut les tracés, catégories (TGV/classique), et points kilométriques de début et fin."
+)
 class SilverLignesPipeline(SQLSilverPipeline):
     """Transform lignes (train lines) data for silver layer using SQL."""
     

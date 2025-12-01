@@ -6,7 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="silver", name="geo", dependencies=["bronze.geo"])
+@register_pipeline(
+    layer="silver", 
+    name="geo", 
+    dependencies=["bronze.geo"],
+    description_fr="Référentiel géographique des communes françaises avec codes INSEE et noms standardisés. Table de référence centrale pour tous les jointures géographiques."
+)
 class SilverGeoPipeline(SQLSilverPipeline):
     """Transform geo data for silver layer using SQL."""
     
