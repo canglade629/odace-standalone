@@ -113,7 +113,7 @@ async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
     """
     Get the complete data catalog with all schemas and tables.
     
-    Scans GCS for Delta tables in bronze, silver, and gold layers.
+    Scans GCS for Delta tables in bronze, silver, silver_v2, and gold layers.
     """
     logger.info("Fetching data catalog")
     settings = get_settings()
@@ -121,18 +121,22 @@ async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
     try:
         schemas = {}
         
-        # Scan each layer
-        for layer in ["bronze", "silver", "gold"]:
+        # Scan each layer (including silver_v2)
+        for layer in ["bronze", "silver", "silver_v2", "gold"]:
             layer_path = f"{settings.delta_path}/{layer}"
-            tables = DeltaOperations.list_delta_tables(layer_path)
-            schemas[layer] = [
-                TableInfo(
-                    name=table["name"],
-                    path=table["path"],
-                    version=table["version"]
-                )
-                for table in tables
-            ]
+            try:
+                tables = DeltaOperations.list_delta_tables(layer_path)
+                schemas[layer] = [
+                    TableInfo(
+                        name=table["name"],
+                        path=table["path"],
+                        version=table["version"]
+                    )
+                    for table in tables
+                ]
+            except Exception as e:
+                logger.warning(f"Could not list tables in {layer}: {e}")
+                schemas[layer] = []
         
         return CatalogResponse(schemas=schemas)
     
@@ -273,15 +277,15 @@ async def get_table_metadata(
     Get metadata for a specific table including schema and row count.
     
     Args:
-        layer: Layer name (bronze, silver, gold)
+        layer: Layer name (bronze, silver, silver_v2, gold)
         table: Table name
     """
     logger.info(f"Fetching metadata for {layer}.{table}")
     settings = get_settings()
     
-    # Validate layer
-    if layer not in ["bronze", "silver", "gold"]:
-        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, or gold")
+    # Validate layer (including silver_v2)
+    if layer not in ["bronze", "silver", "silver_v2", "gold"]:
+        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, silver_v2, or gold")
     
     # Construct table path
     table_path = f"{settings.delta_path}/{layer}/{table}"
@@ -321,16 +325,16 @@ async def preview_table(
     Get a preview of table data with optional filtering and sorting.
     
     Args:
-        layer: Layer name (bronze, silver, gold)
+        layer: Layer name (bronze, silver, silver_v2, gold)
         table: Table name
         preview_req: Preview request with filters and sort options
     """
     logger.info(f"Previewing {layer}.{table} with filters={preview_req.filters}, sort={preview_req.sort_by}")
     settings = get_settings()
     
-    # Validate layer
-    if layer not in ["bronze", "silver", "gold"]:
-        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, or gold")
+    # Validate layer (including silver_v2)
+    if layer not in ["bronze", "silver", "silver_v2", "gold"]:
+        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, silver_v2, or gold")
     
     # Construct table path
     table_path = f"{settings.delta_path}/{layer}/{table}"
@@ -387,11 +391,11 @@ async def execute_sql_query(
     try:
         start_time = time.time()
         
-        # Register all Delta tables from all layers
+        # Register all Delta tables from all layers (including silver_v2)
         registered_tables = []
         registration_errors = []
         
-        for layer in ["bronze", "silver", "gold"]:
+        for layer in ["bronze", "silver", "silver_v2", "gold"]:
             layer_path = f"{settings.delta_path}/{layer}"
             try:
                 tables = DeltaOperations.list_delta_tables(layer_path)

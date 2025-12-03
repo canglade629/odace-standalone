@@ -22,6 +22,12 @@ resource "google_service_account" "odace_pipeline" {
 }
 
 # Grant GCS permissions to service account
+# This permission covers all GCS objects including:
+# - gs://{bucket}/raw/ (raw data)
+# - gs://{bucket}/delta/bronze/ (bronze layer)
+# - gs://{bucket}/delta/silver/ (silver layer V1)
+# - gs://{bucket}/delta/silver_v2/ (silver layer V2 - new)
+# - gs://{bucket}/delta/gold/ (gold layer)
 resource "google_storage_bucket_iam_member" "pipeline_bucket_admin" {
   bucket = var.gcs_bucket
   role   = "roles/storage.objectAdmin"

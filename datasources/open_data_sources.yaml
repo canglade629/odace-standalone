@@ -1,0 +1,20 @@
+# Open Data API Resources Configuration
+# Data source: https://tabular-api.data.gouv.fr/api
+# Documentation: https://www.data.gouv.fr/fr/pages/api-tabular/
+#
+# Note: SNCF transport data (gares and lignes) is handled by dedicated pipelines
+# in app/pipelines/bronze/transport.py using resource IDs:
+#   - d22ba593-90a4-4725-977c-095d1f654d28 (gares)
+#   - 2f204d3f-4274-42fb-934f-4a73954e0c4e (lignes)
+
+resources:
+  - resource_id: "43618998-3b37-4a69-bb25-f321f1a93ed1"
+    name: "loyers_appartements_2023"
+    description: "Carte des loyers - indicateurs de loyers d'annonce pour appartements par commune en 2023"
+    data_type: "csv"
+  
+  - resource_id: "8fac6fb7-cd07-4747-8e0b-b101c476f0da"
+    name: "loyers_appartements_2018"
+    description: "Carte des loyers - indicateurs de loyers d'annonce pour appartements par commune en 2018"
+    data_type: "csv"
+

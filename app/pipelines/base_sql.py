@@ -88,7 +88,7 @@ class SQLSilverPipeline(BaseSilverPipeline):
         """
         Extract table references from SQL query.
         
-        Looks for patterns like bronze_geo, silver_geo, etc.
+        Looks for patterns like bronze_geo, silver_geo, silver_v2_dim_commune, etc.
         
         Args:
             sql: SQL query string
@@ -100,8 +100,8 @@ class SQLSilverPipeline(BaseSilverPipeline):
         
         paths = {}
         
-        # Pattern to find table references like bronze_<name> or silver_<name>
-        pattern = r'\b(bronze|silver)_(\w+)\b'
+        # Pattern to find table references like bronze_<name>, silver_<name>, or silver_v2_<name>
+        pattern = r'\b(bronze|silver(?:_v2)?)_((?:dim_|fact_)?\w+)\b'
         
         # Find all unique matches
         matches = set(re.findall(pattern, sql, re.IGNORECASE))
@@ -113,6 +113,8 @@ class SQLSilverPipeline(BaseSilverPipeline):
             # Generate the GCS path
             if layer_lower == "bronze":
                 path = self.settings.get_bronze_path(table_name)
+            elif layer_lower == "silver_v2":
+                path = self.settings.get_silver_v2_path(table_name)
             else:  # silver
                 path = self.settings.get_silver_path(table_name)
             
@@ -162,9 +164,14 @@ class SQLSilverPipeline(BaseSilverPipeline):
                 loaded_tables[alias] = df
                 logger.info(f"Loaded {len(df)} rows from {alias}")
             except Exception as e:
-                logger.error(f"Failed to load Delta table {alias} from {path}: {e}")
-                logger.error(f"Storage options were: {list(storage_options.keys())}")
-                raise
+                # If table doesn't exist (e.g., silver_v2 table being created), skip it
+                if "no log files" in str(e) or "not found" in str(e).lower():
+                    logger.warning(f"Table {alias} does not exist yet, skipping (this is OK for initial load)")
+                    continue
+                else:
+                    logger.error(f"Failed to load Delta table {alias} from {path}: {e}")
+                    logger.error(f"Storage options were: {list(storage_options.keys())}")
+                    raise
         
         # Execute query with DuckDB
         try:

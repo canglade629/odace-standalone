@@ -13,6 +13,7 @@ class PipelineRegistry:
         self._pipelines: Dict[str, Dict[str, Type]] = {
             "bronze": {},
             "silver": {},
+            "silver_v2": {},
             "gold": {}
         }
         self._dependencies: Dict[str, List[str]] = {}

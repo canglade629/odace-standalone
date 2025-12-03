@@ -6,6 +6,7 @@ from app.pipelines.bronze.transport import BronzeGaresPipeline, BronzeLignesPipe
 from app.pipelines.bronze.zones_attraction import BronzeZonesAttractionPipeline
 from app.pipelines.bronze.siae_structures import BronzeSIAEStructuresPipeline
 from app.pipelines.bronze.siae_postes import BronzeSIAEPostesPipeline
+from app.pipelines.bronze.open_data import BronzeOpenDataPipeline
 
 __all__ = [
     "BronzeAccueillantsPipeline",
@@ -16,5 +17,6 @@ __all__ = [
     "BronzeZonesAttractionPipeline",
     "BronzeSIAEStructuresPipeline",
     "BronzeSIAEPostesPipeline",
+    "BronzeOpenDataPipeline",
 ]
 

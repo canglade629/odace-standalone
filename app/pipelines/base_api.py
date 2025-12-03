@@ -250,6 +250,37 @@ class BaseAPIBronzePipeline(BaseBronzePipeline):
         logger.info(f"Normalized {len(df)} records with {len(df.columns)} columns")
         return df
     
+    def save_raw_data(self, records: List[Dict[str, Any]], table_name: str) -> str:
+        """
+        Save raw JSON data to GCS raw layer with timestamp.
+        
+        Args:
+            records: List of JSON records
+            table_name: Name of the target table
+            
+        Returns:
+            GCS path where raw data was saved
+        """
+        import json
+        from datetime import datetime
+        
+        # Generate timestamped filename
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        filename = f"{table_name}_{timestamp}.json"
+        
+        # Construct raw path
+        raw_path = f"{self.settings.raw_path}/api/{table_name}/{filename}"
+        
+        # Convert records to JSON
+        json_content = json.dumps(records, indent=2, ensure_ascii=False)
+        
+        # Upload to GCS
+        logger.info(f"Saving raw data to {raw_path}")
+        self.gcs.upload_from_string(json_content, raw_path)
+        
+        logger.info(f"Saved {len(records)} records to {raw_path}")
+        return raw_path
+    
     def read_source_file(self, file_path: str) -> pd.DataFrame:
         """
         Override to fetch data from API instead of reading a file.
@@ -264,6 +295,10 @@ class BaseAPIBronzePipeline(BaseBronzePipeline):
         
         # Fetch data asynchronously
         records = asyncio.run(self.fetch_all_data())
+        
+        # Save raw data to GCS raw layer
+        table_name = self.get_target_table()
+        self.save_raw_data(records, table_name)
         
         # Convert to DataFrame
         df = self.normalize_json_to_dataframe(records)
