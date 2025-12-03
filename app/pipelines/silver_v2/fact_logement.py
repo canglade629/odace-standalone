@@ -7,19 +7,19 @@ logger = logging.getLogger(__name__)
 
 
 @register_pipeline(
-    layer="silver_v2",
-    name="fact_logement",
-    dependencies=["bronze.logement", "silver_v2.dim_commune"],
+    layer="silver",
+    name="logement",
+    dependencies=["bronze.logement", "silver.geo"],
     description_fr="Table de faits des prix du logement par commune. Contient les loyers prédits, bornes d'intervalles et niveaux de qualité (normalisée sans duplication géographique)."
 )
 class FactLogementPipeline(SQLSilverV2Pipeline):
     """Transform logement data into normalized fact_logement fact table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_v2_fact_logement"
+        return "silver_fact_logement"
     
     def get_target_table(self) -> str:
-        return "fact_logement"
+        return "logement"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze logement data - FULLY NORMALIZED (no lib_* columns)."""
@@ -63,7 +63,7 @@ class FactLogementPipeline(SQLSilverV2Pipeline):
                 'silver_v2_fact_logement' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM with_row_number l
-            JOIN silver_v2_dim_commune c ON l.code_commune = c.commune_code
+            JOIN silver_geo c ON l.code_commune = c.commune_code
             WHERE rn = 1
               AND l.loypredm2_clean IS NOT NULL
               AND l.loypredm2_clean > 0

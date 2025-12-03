@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 @register_pipeline(
-    layer="silver_v2",
-    name="dim_commune",
+    layer="silver",
+    name="geo",
     dependencies=["bronze.geo"],
     description_fr="Table de dimension des communes françaises avec codes INSEE, départements et régions. Master Data Management (MDM) pour toutes les jointures géographiques."
 )
@@ -16,10 +16,10 @@ class DimCommunePipeline(SQLSilverV2Pipeline):
     """Transform geo data into normalized dim_commune dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_v2_dim_commune"
+        return "silver_geo"
     
     def get_target_table(self) -> str:
-        return "dim_commune"
+        return "geo"
     
     def get_sql_query(self) -> str:
         """
@@ -82,9 +82,9 @@ class DimCommunePipeline(SQLSilverV2Pipeline):
                     WHEN SUBSTRING(code_insee, 1, 3) = '976' THEN '06'
                     ELSE NULL
                 END as region_code,
-                'silver_v2_dim_commune' as job_insert_id,
+                'silver_geo' as job_insert_id,
                 CURRENT_TIMESTAMP as job_insert_date_utc,
-                'silver_v2_dim_commune' as job_modify_id,
+                'silver_geo' as job_modify_id,
                 CURRENT_TIMESTAMP as job_modify_date_utc
             FROM bronze_geo
             WHERE code_insee IS NOT NULL 

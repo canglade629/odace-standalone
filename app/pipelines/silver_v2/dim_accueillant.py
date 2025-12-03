@@ -7,19 +7,19 @@ logger = logging.getLogger(__name__)
 
 
 @register_pipeline(
-    layer="silver_v2",
-    name="dim_accueillant",
-    dependencies=["bronze.accueillants", "silver_v2.dim_commune"],
+    layer="silver",
+    name="accueillants",
+    dependencies=["bronze.accueillants", "silver.geo"],
     description_fr="Table de dimension des structures d'accueil et organisations hôtes avec enrichissement géographique (commune_sk) via code postal."
 )
 class DimAccueillantPipeline(SQLSilverV2Pipeline):
     """Transform accueillants data into normalized dim_accueillant dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_v2_dim_accueillant"
+        return "silver_dim_accueillant"
     
     def get_target_table(self) -> str:
-        return "dim_accueillant"
+        return "accueillants"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze accueillants data with geographic enrichment."""
@@ -46,7 +46,7 @@ class DimAccueillantPipeline(SQLSilverV2Pipeline):
                                  a.statut
                     ) AS rn
                 FROM accueillants_clean a
-                LEFT JOIN silver_v2_dim_commune c
+                LEFT JOIN silver_geo c
                     ON SUBSTRING(a.code_postal, 1, 5) = c.commune_code
             )
             SELECT 

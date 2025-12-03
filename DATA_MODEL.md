@@ -1,71 +1,73 @@
-# Odace Data Model Documentation
+# Odace Data Model
 
-## Table of Contents
-- [Architecture Overview](#architecture-overview)
-- [Silver Layer Schema](#silver-layer-schema)
-- [Join Relationships](#join-relationships)
-- [Data Flow](#data-flow)
-- [Use Cases](#use-cases)
+## Overview
 
----
+The Odace data platform follows a **medallion architecture** with three layers:
 
-## Architecture Overview
+- **Bronze**: Raw data ingestion (files + APIs)
+- **Silver**: Cleaned, standardized tables (8 tables)
+- **Gold**: Business aggregations and metrics
 
-The Odace data pipeline follows a medallion architecture with three layers:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        GOLD LAYER                                │
-│              (Aggregated Business Metrics)                       │
-└─────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                       SILVER LAYER                               │
-│        (Cleaned, Standardized, Joined Data)                      │
-│                                                                   │
-│  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │   geo    │  │ accueillants│  │ logement │  │    gares     │  │
-│  └──────────┘  └────────────┘  └──────────┘  └──────────────┘  │
-│  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │  lignes  │  │zones_attrac│  │   siae   │  │ siae_postes  │  │
-│  └──────────┘  └────────────┘  │structures│  └──────────────┘  │
-│                                 └──────────┘                     │
-└─────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                       BRONZE LAYER                               │
-│            (Raw Data, Minimal Transformation)                    │
-│                                                                   │
-│  File Ingestion          │         API Ingestion                │
-│  ─────────────────────   │   ───────────────────────           │
-│  • geo                   │   • siae_structures                  │
-│  • accueillants          │   • siae_postes                      │
-│  • logement              │                                      │
-│  • gares                 │                                      │
-│  • lignes                │                                      │
-│  • zones_attraction      │                                      │
-└─────────────────────────────────────────────────────────────────┘
-```
+This document describes the **Silver layer** schema.
 
 ---
 
-## Silver Layer Schema
+## Silver Layer Tables
 
-### 1. geo (Geographic Reference Data)
+### Core Entities
 
-**Purpose**: Master geographic reference table for French communes with INSEE codes.
+| Table | Type | Purpose | Rows |
+|-------|------|---------|------|
+| `geo` | Dimension | French communes (geographic reference) | ~34,935 |
+| `accueillants` | Dimension | Host organization locations | ~1,293 |
+| `gares` | Dimension | Railway stations | ~2,974 |
+| `lignes` | Dimension | Railway lines | ~933 |
+| `siae_structures` | Dimension | Social inclusion employment structures | ~1,976 |
+| `logement` | Fact | Housing prices by commune | ~34,915 |
+| `zones_attraction` | Fact | Urban area influence zones | ~26,209 |
+| `siae_postes` | Fact | Job openings in SIAE structures | ~4,219 |
 
-**Schema**:
-| Field | Type | Description | Key |
-|-------|------|-------------|-----|
-| `CODGEO` | STRING | INSEE commune code (5 digits) | PRIMARY KEY |
-| `LIBGEO` | STRING | Standardized commune name | |
+**Total: 107,454 rows**
 
-**Records**: ~34,935 French communes
+---
 
-**Usage**: Central reference table for geographic joins.
+## Understanding Surrogate Keys
+
+All tables use **surrogate keys** (`_sk` suffix) for unique identification and joins:
+
+- **Format**: MD5 hash-based unique identifier
+- **Purpose**: Stable, consistent record identity
+- **Usage**: Use `_sk` columns for all joins between tables
+
+### Standard Columns
+
+Every table includes:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `{entity}_sk` | STRING | Surrogate key (MD5 hash) |
+| `job_insert_id` | STRING | Pipeline that created the record |
+| `job_insert_date_utc` | TIMESTAMP | When record was created |
+| `job_modify_id` | STRING | Pipeline that last modified |
+| `job_modify_date_utc` | TIMESTAMP | When record was last modified |
+
+---
+
+## Table Schemas
+
+### 1. geo (Geographic Reference)
+
+**Purpose**: Master reference table for French communes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `commune_sk` | STRING | **Surrogate key** (PK) |
+| `commune_code` | STRING | INSEE code (5 digits) |
+| `commune_label` | STRING | Commune name |
+| `departement_code` | STRING | Department code (2 digits) |
+| `region_code` | STRING | Region code |
+
+**Key Column**: `commune_sk` is referenced by most other tables for geographic joins.
 
 ---
 
@@ -73,670 +75,316 @@ The Odace data pipeline follows a medallion architecture with three layers:
 
 **Purpose**: Locations of host structures/organizations.
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `statut` | STRING | Status of the host structure | |
-| `Ville` | STRING | City name | → geo.LIBGEO |
-| `Code_postal` | STRING | Postal code (5 digits) | |
-| `Latitude` | DOUBLE | WGS84 latitude | Spatial |
-| `Longitude` | DOUBLE | WGS84 longitude | Spatial |
-
-**Records**: ~1,634 host locations
-
-**Join Keys**:
-- City name → `geo.LIBGEO`
-- Spatial coordinates for proximity analysis
+| Column | Type | Description |
+|--------|------|-------------|
+| `accueillant_sk` | STRING | **Surrogate key** (PK) |
+| `commune_sk` | STRING | **FK** → `geo.commune_sk` |
+| `statut` | STRING | Status of host structure |
+| `ville` | STRING | City name |
+| `code_postal` | STRING | Postal code |
+| `latitude` | DOUBLE | WGS84 latitude |
+| `longitude` | DOUBLE | WGS84 longitude |
 
 ---
 
-### 3. logement (Housing Data)
+### 3. gares (Railway Stations)
 
-**Purpose**: Housing prices and statistics by commune.
+**Purpose**: Train station locations and metadata.
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `code_commune` | STRING | INSEE commune code (5 digits) | PRIMARY KEY → geo.CODGEO |
-| `lib_commune` | STRING | Commune name | |
-| `lib_epci` | STRING | EPCI (intercommunal) name | |
-| `lib_dep` | STRING | Department name | |
-| `lib_reg` | STRING | Region code | |
-| `prix_loyer` | DOUBLE | Predicted rent per m² | |
-| `borne_inf_pred` | DOUBLE | Lower bound of prediction | |
-| `borne_sup_pred` | DOUBLE | Upper bound of prediction | |
-| `niveau_pred` | STRING | Prediction level | |
-| `rescued_data` | STRING | Data quality flag | |
+| Column | Type | Description |
+|--------|------|-------------|
+| `gare_sk` | STRING | **Surrogate key** (PK) |
+| `commune_sk` | STRING | **FK** → `geo.commune_sk` |
+| `code_uic` | STRING | UIC station code |
+| `libelle` | STRING | Station name |
+| `fret` | BOOLEAN | Freight service available |
+| `voyageurs` | BOOLEAN | Passenger service available |
+| `code_ligne` | STRING | Railway line code |
+| `commune` | STRING | Commune name |
+| `departement` | STRING | Department code |
+| `latitude` | DOUBLE | WGS84 latitude |
+| `longitude` | DOUBLE | WGS84 longitude |
 
-**Records**: ~34,928 communes (deduplicated)
-
-**Join Keys**:
-- `code_commune` → `geo.CODGEO` (PRIMARY JOIN)
-
-**Special Handling**: 
-- Large city arrondissements mapped to main commune codes
-- Paris (751XX → 75056), Lyon (693XX → 69123), Marseille (132XX → 13055)
+**Filter**: Only passenger stations (`voyageurs = TRUE`)
 
 ---
 
-### 4. gares (Train Stations)
-
-**Purpose**: Railway station locations and metadata.
-
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `code_uic` | STRING | UIC station code (unique) | PRIMARY KEY |
-| `libelle` | STRING | Station name | |
-| `fret` | STRING | Freight service (O/N) | |
-| `voyageurs` | STRING | Passenger service (O/N) | |
-| `code_ligne` | STRING | Line code | → lignes.code_ligne |
-| `commune` | STRING | Commune name | → geo.LIBGEO |
-| `departemen` | STRING | Department code | |
-| `latitude` | DOUBLE | WGS84 latitude | Spatial |
-| `longitude` | DOUBLE | WGS84 longitude | Spatial |
-| `c_geo` | STRING | Geographic code | → geo.CODGEO |
-| `ingestion_timestamp` | TIMESTAMP | Data load timestamp | |
-
-**Records**: ~2,974 passenger stations (deduplicated)
-
-**Join Keys**:
-- `c_geo` → `geo.CODGEO`
-- `commune` → `geo.LIBGEO`
-- `code_ligne` → `lignes.code_ligne`
-- Spatial coordinates for proximity analysis
-
-**Filter**: Only passenger stations (`voyageurs = 'O'`)
-
----
-
-### 5. lignes (Railway Lines)
+### 4. lignes (Railway Lines)
 
 **Purpose**: Railway line segments and characteristics.
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `code_ligne` | STRING | Line code (unique) | PRIMARY KEY |
-| `lib_ligne` | STRING | Line name | |
-| `catlig` | STRING | Line category | |
-| `isTGV` | STRING | High-speed line flag (0/1) | |
-| `rg_troncon` | INTEGER | Section rank | |
-| `c_geo_d` | STRING | Departure commune code | → geo.CODGEO |
-| `c_geo_f` | STRING | Arrival commune code | → geo.CODGEO |
-| `x_d_wgs84` | DOUBLE | Departure longitude | Spatial |
-| `y_d_wgs84` | DOUBLE | Departure latitude | Spatial |
-| `x_f_wgs84` | DOUBLE | Arrival longitude | Spatial |
-| `y_f_wgs84` | DOUBLE | Arrival latitude | Spatial |
-| `ingestion_timestamp` | TIMESTAMP | Data load timestamp | |
-
-**Records**: ~933 line segments (deduplicated)
-
-**Join Keys**:
-- `code_ligne` → `gares.code_ligne`
-- `c_geo_d` / `c_geo_f` → `geo.CODGEO`
+| Column | Type | Description |
+|--------|------|-------------|
+| `ligne_sk` | STRING | **Surrogate key** (PK) |
+| `code_ligne` | STRING | Line code |
+| `libelle` | STRING | Line name |
+| `categorie` | STRING | Line category |
+| `is_tgv` | BOOLEAN | High-speed line flag |
+| `rg_troncon` | INTEGER | Section rank |
+| `longitude_debut` | DOUBLE | Start longitude |
+| `latitude_debut` | DOUBLE | Start latitude |
+| `longitude_fin` | DOUBLE | End longitude |
+| `latitude_fin` | DOUBLE | End latitude |
 
 ---
 
-### 6. zones_attraction (Urban Attraction Zones)
+### 5. siae_structures (SIAE Organizations)
 
-**Purpose**: Urban area of influence (AAV - Aire d'Attraction des Villes).
+**Purpose**: Social inclusion employment structures.
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `CODGEO` | STRING | Commune INSEE code | PRIMARY KEY → geo.CODGEO |
-| `LIBGEO` | STRING | Commune name | |
-| `CODEAAV` | STRING | Urban area code | |
-| `CODGEOAAV` | STRING | Central city INSEE code | → geo.CODGEO |
-| `LIBAAV2020` | STRING | Urban area name | |
-| `CATEAAV` | STRING | Urban area category | |
-| `DEP` | STRING | Department code | |
-| `REG` | STRING | Region code | |
-
-**Records**: ~28,377 communes in urban areas
-
-**Join Keys**:
-- `CODGEO` → `geo.CODGEO` (commune)
-- `CODGEOAAV` → `geo.CODGEO` (central city)
-
-**Special Processing**:
-- Excludes communes not in urban areas (AAV2020 = '000')
-- Splits multi-city urban areas
-- Fuzzy matching on city names
+| Column | Type | Description |
+|--------|------|-------------|
+| `siae_structure_sk` | STRING | **Surrogate key** (PK) |
+| `commune_sk` | STRING | **FK** → `geo.commune_sk` |
+| `id` | STRING | Original structure UUID |
+| `siret` | STRING | SIRET business identifier |
+| `structure_type` | STRING | Type (EI, AI, ETTI, etc.) |
+| `raison_sociale` | STRING | Legal name |
+| `enseigne` | STRING | Trade name |
+| `telephone` | STRING | Phone number |
+| `courriel` | STRING | Email address |
+| `site_web` | STRING | Website URL |
+| `accepte_candidatures` | BOOLEAN | Accepting applications |
+| `adresse_ligne1` | STRING | Address line 1 |
+| `code_postal` | STRING | Postal code |
+| `ville` | STRING | City name |
+| `departement` | STRING | Department code |
 
 ---
 
-### 7. siae_structures (Social Inclusion Employment Structures)
+### 6. logement (Housing Prices)
 
-**Purpose**: Employment structures offering social inclusion opportunities.
+**Purpose**: Predicted housing rent prices by commune.
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `id` | STRING | Unique structure ID (UUID) | PRIMARY KEY |
-| `siret` | STRING | SIRET business identifier | |
-| `structure_type` | STRING | Structure type (EI, AI, ETTI, etc.) | |
-| `legal_name` | STRING | Legal company name | |
-| `trade_name` | STRING | Trade name | |
-| `phone` | STRING | Phone number | |
-| `email` | STRING | Email address | |
-| `website` | STRING | Website URL | |
-| `description` | STRING | Description | |
-| `accepting_applications` | BOOLEAN | Whether accepting job applications | |
-| `created_at` | TIMESTAMP | Creation date | |
-| `updated_at` | TIMESTAMP | Last update date | |
-| `address_line_1` | STRING | Address line 1 | |
-| `address_line_2` | STRING | Address line 2 | |
-| `postal_code` | STRING | Postal code (5 digits) | |
-| `city` | STRING | City name (normalized) | → geo.LIBGEO |
-| `department` | STRING | Department code | |
-| `insee_code` | STRING | INSEE code (enriched via join) | → geo.CODGEO |
-| `standardized_city_name` | STRING | Standardized city name | |
-
-**Records**: ~5,000-10,000 structures (national estimate)
-
-**Data Source**: API - emplois.inclusion.beta.gouv.fr
-
-**Join Keys**:
-- `insee_code` → `geo.CODGEO` (enriched in silver layer)
-- `city` + `postal_code` → `geo` (fuzzy match)
-
-**Enrichment**: INSEE codes added by joining with `geo` table during silver transformation.
+| Column | Type | Description |
+|--------|------|-------------|
+| `logement_sk` | STRING | **Surrogate key** (PK) |
+| `commune_sk` | STRING | **FK** → `geo.commune_sk` |
+| `epci_code` | STRING | EPCI (intercommunal) code |
+| `loyer_predicted_m2` | DECIMAL | Predicted rent per m² |
+| `loyer_lower_bound_m2` | DECIMAL | Lower prediction bound |
+| `loyer_upper_bound_m2` | DECIMAL | Upper prediction bound |
+| `prediction_level` | STRING | Prediction quality level |
+| `code_departement` | STRING | Department code |
+| `code_region` | STRING | Region code |
 
 ---
 
-### 8. siae_postes (Job Positions in SIAE Structures)
+### 7. zones_attraction (Urban Influence Zones)
 
-**Purpose**: Active job openings in social inclusion structures.
+**Purpose**: Urban areas of influence (AAV - Aire d'Attraction des Villes).
 
-**Schema**:
-| Field | Type | Description | Join Key |
-|-------|------|-------------|----------|
-| `poste_id` | INTEGER | Unique job position ID | PRIMARY KEY |
-| `structure_id` | STRING | Parent structure ID | → siae_structures.id |
-| `siret` | STRING | SIRET of parent structure | |
-| `rome_code` | STRING | ROME job classification code | |
-| `job_title` | STRING | Job title | |
-| `job_description` | STRING | Job description | |
-| `contract_type` | STRING | Type of contract | |
-| `is_recruiting` | STRING | Active recruitment flag | |
-| `positions_available` | INTEGER | Number of open positions | |
-| `created_at` | TIMESTAMP | Creation date | |
-| `updated_at` | TIMESTAMP | Last update date | |
-| `city` | STRING | City (from structure) | → geo.LIBGEO |
-| `postal_code` | STRING | Postal code (from structure) | |
-| `department` | STRING | Department (from structure) | |
-| `insee_code` | STRING | INSEE code (from structure) | → geo.CODGEO |
-| `structure_type` | STRING | Type of parent structure | |
-| `structure_name` | STRING | Name of parent structure | |
+| Column | Type | Description |
+|--------|------|-------------|
+| `zone_attraction_sk` | STRING | **Surrogate key** (PK) |
+| `commune_sk` | STRING | **FK** → `geo.commune_sk` (commune) |
+| `commune_pole_sk` | STRING | **FK** → `geo.commune_sk` (urban center) |
+| `aire_attraction_code` | STRING | Urban area code |
+| `aire_attraction_label` | STRING | Urban area name |
+| `aire_attraction_categorie` | STRING | Urban area category |
+| `departement_code` | STRING | Department code |
+| `region_code` | STRING | Region code |
 
-**Records**: ~10,000-30,000 job positions (national estimate)
+**Special**: This table has **two** foreign keys to `geo`:
+- `commune_sk`: The commune in the urban area
+- `commune_pole_sk`: The central city of the urban area
 
-**Data Source**: API - emplois.inclusion.beta.gouv.fr (extracted from structures)
+---
 
-**Join Keys**:
-- `structure_id` → `siae_structures.id`
-- `insee_code` → `geo.CODGEO` (inherited from structure)
+### 8. siae_postes (SIAE Job Openings)
 
-**Geographic Context**: All geographic fields inherited from parent structure.
+**Purpose**: Active job positions in SIAE structures.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `siae_poste_sk` | STRING | **Surrogate key** (PK) |
+| `siae_structure_sk` | STRING | **FK** → `siae_structures.siae_structure_sk` |
+| `poste_id` | STRING | Original position ID |
+| `structure_id` | STRING | Parent structure ID (UUID) |
+| `rome_code` | STRING | ROME job classification |
+| `intitule_poste` | STRING | Job title |
+| `description_poste` | STRING | Job description |
+| `contrat_type` | STRING | Contract type |
+| `poste_disponible` | BOOLEAN | Position available |
+| `postes_nombre` | INTEGER | Number of openings |
 
 ---
 
 ## Join Relationships
 
-### Entity Relationship Diagram
+### Primary Join Pattern: Geographic Hub
 
-```mermaid
-erDiagram
-    GEO ||--o{ LOGEMENT : "CODGEO"
-    GEO ||--o{ ZONES_ATTRACTION : "CODGEO (commune)"
-    GEO ||--o{ ZONES_ATTRACTION : "CODGEOAAV (center)"
-    GEO ||--o{ GARES : "c_geo"
-    GEO ||--o{ LIGNES : "c_geo_d/c_geo_f"
-    GEO ||--o{ SIAE_STRUCTURES : "insee_code"
-    GEO ||--o{ ACCUEILLANTS : "Ville (fuzzy)"
-    SIAE_STRUCTURES ||--o{ SIAE_POSTES : "structure_id"
-    GARES }o--|| LIGNES : "code_ligne"
-
-    GEO {
-        string CODGEO PK
-        string LIBGEO
-    }
-    
-    LOGEMENT {
-        string code_commune PK
-        string lib_commune
-        double prix_loyer
-    }
-    
-    ACCUEILLANTS {
-        string Ville
-        string Code_postal
-        double Latitude
-        double Longitude
-    }
-    
-    GARES {
-        string code_uic PK
-        string libelle
-        string c_geo FK
-        string code_ligne FK
-        double latitude
-        double longitude
-    }
-    
-    LIGNES {
-        string code_ligne PK
-        string lib_ligne
-        string isTGV
-        string c_geo_d FK
-        string c_geo_f FK
-    }
-    
-    ZONES_ATTRACTION {
-        string CODGEO PK
-        string CODEAAV
-        string CODGEOAAV FK
-        string LIBAAV2020
-    }
-    
-    SIAE_STRUCTURES {
-        string id PK
-        string siret
-        string insee_code FK
-        string city
-        string postal_code
-    }
-    
-    SIAE_POSTES {
-        integer poste_id PK
-        string structure_id FK
-        string insee_code FK
-        string rome_code
-        integer positions_available
-    }
-```
-
-### Core Join Patterns
-
-#### 1. Geographic Core (geo as Hub)
+Most tables connect through the **`geo`** table using `commune_sk`:
 
 ```
-                    ┌─────────────────┐
-                    │      GEO        │
-                    │   (CODGEO)      │
-                    └────────┬────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-        ▼                    ▼                    ▼
-┌───────────────┐   ┌────────────────┐   ┌──────────────┐
-│   LOGEMENT    │   │     GARES      │   │    SIAE      │
-│ (code_commune)│   │    (c_geo)     │   │(insee_code)  │
-└───────────────┘   └────────────────┘   └──────────────┘
-                             │
-                             ▼
-                    ┌────────────────┐
-                    │    LIGNES      │
-                    │ (code_ligne)   │
-                    └────────────────┘
+                    ┌─────────────┐
+                    │     geo     │
+                    │ (commune_sk)│
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+  ┌──────────┐      ┌──────────┐    ┌──────────────┐
+  │ logement │      │  gares   │    │    siae      │
+  └──────────┘      └──────────┘    │  structures  │
+                                     └──────┬───────┘
+                                            │
+                                            ▼
+                                    ┌──────────────┐
+                                    │    siae      │
+                                    │   postes     │
+                                    └──────────────┘
 ```
 
-**Join Key**: `CODGEO` (INSEE commune code)
+### Key Join Examples
 
-**Datasets Joined**:
-- `logement` via `code_commune`
-- `gares` via `c_geo`
-- `lignes` via `c_geo_d` / `c_geo_f`
-- `zones_attraction` via `CODGEO` or `CODGEOAAV`
-- `siae_structures` via `insee_code`
-- `siae_postes` via `insee_code` (inherited)
+#### 1. Housing Prices by Commune
 
----
-
-#### 2. Transportation Network Join
-
-```
-┌────────────────┐
-│     GARES      │
-│  (code_ligne)  │
-└────────┬───────┘
-         │
-         │ code_ligne
-         │
-         ▼
-┌────────────────┐
-│    LIGNES      │
-│  (code_ligne)  │
-└────────────────┘
+```sql
+SELECT 
+    g.commune_label,
+    g.departement_code,
+    l.loyer_predicted_m2
+FROM silver_geo g
+JOIN silver_logement l ON l.commune_sk = g.commune_sk
+WHERE g.departement_code = '75'
+ORDER BY l.loyer_predicted_m2 DESC;
 ```
 
-**Join Key**: `code_ligne`
+#### 2. SIAE Jobs with Structure Details
 
-**Purpose**: Link stations to railway lines for route analysis.
-
----
-
-#### 3. SIAE Hierarchy Join
-
-```
-┌─────────────────────┐
-│  SIAE_STRUCTURES    │
-│       (id)          │
-└──────────┬──────────┘
-           │
-           │ structure_id
-           │
-           ▼
-┌─────────────────────┐
-│   SIAE_POSTES       │
-│   (structure_id)    │
-└─────────────────────┘
+```sql
+SELECT 
+    s.raison_sociale,
+    s.ville,
+    p.intitule_poste,
+    p.postes_nombre
+FROM silver_siae_structures s
+JOIN silver_siae_postes p ON p.siae_structure_sk = s.siae_structure_sk
+WHERE s.accepte_candidatures = TRUE
+  AND p.poste_disponible = TRUE;
 ```
 
-**Join Key**: `structure_id`
+#### 3. Train Stations by Commune
 
-**Purpose**: Link job positions to their parent structures for full context.
-
----
-
-#### 4. Urban Area Relationships
-
-```
-┌────────────────────┐
-│  ZONES_ATTRACTION  │
-│     (CODGEO)       │  ──────► Commune in urban area
-└──────────┬─────────┘
-           │
-           │ CODGEOAAV
-           │
-           ▼
-      ┌─────────┐
-      │   GEO   │  ──────► Central city of urban area
-      └─────────┘
+```sql
+SELECT 
+    g.commune_label,
+    COUNT(ga.gare_sk) as nb_gares
+FROM silver_geo g
+LEFT JOIN silver_gares ga ON ga.commune_sk = g.commune_sk
+GROUP BY g.commune_label
+HAVING COUNT(ga.gare_sk) > 0
+ORDER BY nb_gares DESC;
 ```
 
-**Join Keys**: 
-- `CODGEO` → commune itself
-- `CODGEOAAV` → central city of the urban area
+#### 4. SIAE in Urban Areas
 
-**Purpose**: Understand urban area influence and hierarchy.
-
----
-
-### Multi-Table Join Scenarios
-
-#### Scenario 1: Housing Accessibility to SIAE Jobs
-
-```
-┌─────────┐    CODGEO    ┌──────────┐    CODGEO    ┌──────────────┐
-│   GEO   │ ◄──────────► │ LOGEMENT │              │     SIAE     │
-└─────────┘              └──────────┘              │  STRUCTURES  │
-     ▲                                              └──────────────┘
-     │                                                      ▲
-     │ CODGEO (insee_code)                                │
-     └──────────────────────────────────────────────────────┘
-
-Purpose: Analyze housing prices near employment opportunities
-```
-
-#### Scenario 2: Transport Access to SIAE Locations
-
-```
-┌─────────┐    c_geo     ┌────────┐
-│   GEO   │ ◄──────────► │ GARES  │
-└─────────┘              └────────┘
-     ▲
-     │ CODGEO (insee_code)
-     │
-┌──────────────┐
-│     SIAE     │
-│  STRUCTURES  │
-└──────────────┘
-
-Purpose: Assess public transport accessibility to SIAE jobs
-```
-
-#### Scenario 3: Complete Urban Employment Analysis
-
-```
-                    ┌─────────┐
-                    │   GEO   │
-                    └────┬────┘
-                         │ CODGEO
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-┌──────────────┐  ┌──────────┐   ┌──────────────┐
-│   LOGEMENT   │  │  GARES   │   │     SIAE     │
-└──────────────┘  └──────────┘   │  STRUCTURES  │
-        │                │        └──────┬───────┘
-        │                │               │
-        └────────────────┼───────────────┘
-                         │
-                         ▼
-                ┌─────────────────┐
-                │ ZONES_ATTRACTION│
-                └─────────────────┘
-
-Purpose: Comprehensive analysis of housing, transport, and 
-         employment in urban areas
+```sql
+SELECT 
+    za.aire_attraction_label,
+    COUNT(DISTINCT s.siae_structure_sk) as nb_structures,
+    SUM(p.postes_nombre) as total_postes
+FROM silver_zones_attraction za
+JOIN silver_geo g ON za.commune_sk = g.commune_sk
+JOIN silver_siae_structures s ON s.commune_sk = g.commune_sk
+LEFT JOIN silver_siae_postes p ON p.siae_structure_sk = s.siae_structure_sk
+GROUP BY za.aire_attraction_label
+ORDER BY total_postes DESC;
 ```
 
 ---
 
-### Spatial Joins (Coordinates)
+## Common Query Patterns
 
-For proximity analysis using latitude/longitude:
+### Find Communes with SIAE and Low Housing Costs
 
-**Tables with Spatial Data**:
-- `accueillants`: Latitude, Longitude
-- `gares`: latitude, longitude
-- `lignes`: x_d_wgs84/y_d_wgs84, x_f_wgs84/y_f_wgs84
-
-**Use Cases**:
-- Find nearest train station to SIAE structure
-- Calculate distance from host location to employment opportunity
-- Identify SIAE structures within N km of a specific location
-
-**Note**: Requires spatial functions (e.g., Haversine distance, PostGIS ST_Distance)
-
----
-
-## Data Flow
-
-### Bronze → Silver Transformation Summary
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    BRONZE LAYER                              │
-│                   (Raw Data)                                 │
-├─────────────────────────────────────────────────────────────┤
-│  • Raw files from GCS                                       │
-│  • API responses (SIAE)                                     │
-│  • Nested structures                                        │
-│  • Inconsistent formats                                     │
-│  • Duplicates                                               │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     │ Transformations:
-                     │ • Deduplication
-                     │ • Type casting
-                     │ • Column renaming
-                     │ • Geo enrichment (SIAE)
-                     │ • Flattening nested data
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    SILVER LAYER                              │
-│                (Clean, Standardized)                         │
-├─────────────────────────────────────────────────────────────┤
-│  • Deduplicated records                                     │
-│  • Standardized column names                                │
-│  • Consistent data types                                    │
-│  • INSEE codes enriched                                     │
-│  • Ready for analysis                                       │
-└─────────────────────────────────────────────────────────────┘
+```sql
+SELECT 
+    g.commune_label,
+    l.loyer_predicted_m2,
+    COUNT(s.siae_structure_sk) as nb_siae
+FROM silver_geo g
+JOIN silver_logement l ON l.commune_sk = g.commune_sk
+JOIN silver_siae_structures s ON s.commune_sk = g.commune_sk
+WHERE l.loyer_predicted_m2 < 10.0
+GROUP BY g.commune_label, l.loyer_predicted_m2
+HAVING COUNT(s.siae_structure_sk) > 0
+ORDER BY nb_siae DESC, l.loyer_predicted_m2 ASC;
 ```
 
-### Key Transformations by Table
+### Transport Accessibility
 
-| Table | Key Transformations |
-|-------|-------------------|
-| **geo** | • Extract INSEE code and name<br>• No deduplication needed |
-| **accueillants** | • Handle missing status<br>• Preserve coordinates |
-| **logement** | • Map Paris/Lyon/Marseille arrondissements<br>• Deduplicate by commune<br>• Keep latest data |
-| **gares** | • Filter passenger stations only<br>• Deduplicate by UIC code<br>• Rename coordinates |
-| **lignes** | • Add TGV flag<br>• Deduplicate by line code<br>• Cast data types |
-| **zones_attraction** | • Exclude non-urban communes<br>• Split multi-city areas<br>• Fuzzy match city names with geo |
-| **siae_structures** | • Normalize city names<br>• **Enrich with INSEE codes via geo join**<br>• Clean contact info |
-| **siae_postes** | • Link to parent structure<br>• **Inherit geo context from structure**<br>• Standardize boolean flags |
-
----
-
-## Use Cases
-
-### 1. Housing Affordability Analysis
-
-**Question**: Which communes have SIAE employment opportunities with affordable housing?
-
-**Tables Joined**:
-- `siae_structures` (employment locations)
-- `siae_postes` (number of jobs available)
-- `logement` (housing prices)
-- `geo` (commune reference)
-
-**Join Path**: 
+```sql
+SELECT 
+    s.raison_sociale,
+    s.ville,
+    ga.libelle as gare_proche,
+    ga.code_ligne
+FROM silver_siae_structures s
+JOIN silver_geo g ON s.commune_sk = g.commune_sk
+LEFT JOIN silver_gares ga ON ga.commune_sk = g.commune_sk
+WHERE ga.voyageurs = TRUE;
 ```
-siae_structures.insee_code → geo.CODGEO ← logement.code_commune
-```
-
-**Analysis**: Compare `logement.prix_loyer` with `siae_postes.positions_available` by commune.
-
----
-
-### 2. Public Transport Accessibility
-
-**Question**: How accessible are SIAE jobs by train?
-
-**Tables Joined**:
-- `siae_structures` (employment locations)
-- `gares` (train stations)
-- `lignes` (railway lines)
-- `geo` (commune reference)
-
-**Join Path**:
-```
-siae_structures.insee_code → geo.CODGEO ← gares.c_geo
-gares.code_ligne → lignes.code_ligne
-```
-
-**Analysis**: Calculate distance from SIAE to nearest station, check line types (TGV vs regional).
-
----
-
-### 3. Urban Area Employment Coverage
-
-**Question**: Which urban areas have the most SIAE structures?
-
-**Tables Joined**:
-- `zones_attraction` (urban areas)
-- `siae_structures` (SIAE locations)
-- `geo` (commune reference)
-
-**Join Path**:
-```
-zones_attraction.CODGEO → geo.CODGEO ← siae_structures.insee_code
-```
-
-**Analysis**: Count SIAE by urban area, analyze by category (`CATEAAV`).
-
----
-
-### 4. Job Position Analysis
-
-**Question**: What types of jobs are available in each department?
-
-**Tables Joined**:
-- `siae_postes` (jobs)
-- `siae_structures` (structure metadata)
-
-**Join Path**:
-```
-siae_postes.structure_id → siae_structures.id
-```
-
-**Analysis**: Aggregate by `department` and `rome_code`, sum `positions_available`.
-
----
-
-### 5. Geographic Coverage Analysis
-
-**Question**: Which communes lack SIAE employment opportunities?
-
-**Tables Joined**:
-- `geo` (all communes)
-- `siae_structures` (SIAE locations)
-
-**Join Path**:
-```
-geo.CODGEO ← LEFT JOIN ← siae_structures.insee_code
-```
-
-**Analysis**: Find communes with NULL SIAE matches, cross-reference with `logement` for population/housing data.
-
----
-
-### 6. Proximity Analysis
-
-**Question**: Find all SIAE structures within 10km of a specific location.
-
-**Tables Used**:
-- `siae_structures` (with `postal_code`, `city`)
-- `accueillants` or `gares` (reference locations with coordinates)
-
-**Method**: 
-- Option 1: Join via `geo` and use postal code proximity
-- Option 2: Geocode SIAE addresses and calculate Haversine distance
-
-**Note**: SIAE structures don't have direct coordinates, but can be geocoded via address.
 
 ---
 
 ## Data Quality Notes
 
-### INSEE Code Coverage
+### Foreign Key Coverage
 
-- **logement**: 100% (INSEE codes are source data)
-- **gares**: ~95% (some stations lack `c_geo`)
-- **siae_structures**: ~80-90% (enriched via city name fuzzy matching)
-- **zones_attraction**: 100% (INSEE codes are source data)
+- **logement** → `geo`: 100% (INSEE codes are source data)
+- **siae_structures** → `geo`: ~90% (enriched via fuzzy city matching)
+- **gares** → `geo`: Currently being improved
+- **zones_attraction** → `geo`: 100% (INSEE codes are source data)
 
-### Deduplication Strategy
+### Deduplication
 
-- **Primary key deduplication**: `gares` (UIC code), `lignes` (line code)
-- **Composite key deduplication**: `logement` (commune code + latest timestamp)
-- **No deduplication needed**: `geo`, `accueillants`, `zones_attraction`, `siae_structures`, `siae_postes`
+All tables are **deduplicated** in the Silver layer:
+- Unique records per surrogate key
+- Latest data kept for time-series sources
+- Composite key deduplication where needed
 
-### Known Data Limitations
+---
 
-1. **SIAE Coordinates**: Not directly available, requires geocoding
-2. **City Name Matching**: Fuzzy logic may miss some matches (accents, hyphens, special characters)
-3. **Large Cities**: Paris/Lyon/Marseille arrondissements aggregated to main commune
-4. **Temporal Data**: Housing and SIAE data have timestamps, but others are point-in-time snapshots
+## Quick Reference
+
+### All Foreign Keys
+
+| Table | Foreign Key | References |
+|-------|-------------|------------|
+| `accueillants` | `commune_sk` | `geo.commune_sk` |
+| `gares` | `commune_sk` | `geo.commune_sk` |
+| `siae_structures` | `commune_sk` | `geo.commune_sk` |
+| `logement` | `commune_sk` | `geo.commune_sk` |
+| `zones_attraction` | `commune_sk` | `geo.commune_sk` |
+| `zones_attraction` | `commune_pole_sk` | `geo.commune_sk` |
+| `siae_postes` | `siae_structure_sk` | `siae_structures.siae_structure_sk` |
+
+### Naming Conventions
+
+- **Surrogate keys**: `{entity}_sk` (MD5 hash)
+- **Code fields**: `{entity}_code` (official codes like INSEE, UIC, ROME)
+- **Label fields**: `{entity}_label` (human-readable names)
+- **Dates**: `{field}_date_utc` (UTC timestamps)
+- **Foreign keys**: Referenced entity's `_sk` column
 
 ---
 
 ## Summary
 
-The Odace silver layer provides a **clean, standardized, and join-ready** dataset with:
+The Silver layer provides **8 clean, join-ready tables** with:
 
-- **8 core tables** covering geography, housing, transportation, and employment
-- **INSEE codes as primary join key** for geographic analysis
-- **Automatic enrichment** of API data (SIAE) with geographic context
-- **Multiple join patterns** supporting complex multi-table analysis
-- **Spatial capabilities** for proximity-based queries
+✅ **Surrogate keys** (`_sk`) for stable record identification  
+✅ **Geographic enrichment** via `commune_sk` joins  
+✅ **Full metadata tracking** (insert/modify timestamps)  
+✅ **Consistent naming** across all tables  
+✅ **Deduplicated data** ready for analysis
 
-All tables are optimized for analytical queries and ready for gold layer aggregations or direct business intelligence consumption.
+**Primary join key**: `commune_sk` connects most tables through the `geo` hub.
 
+---
+
+*Last updated: December 3, 2025*  
+*Schema version: Silver V2*

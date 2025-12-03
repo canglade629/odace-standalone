@@ -7,19 +7,19 @@ logger = logging.getLogger(__name__)
 
 
 @register_pipeline(
-    layer="silver_v2",
-    name="fact_siae_poste",
-    dependencies=["bronze.siae_postes", "silver_v2.dim_siae_structure"],
+    layer="silver",
+    name="siae_postes",
+    dependencies=["bronze.siae_postes", "silver.siae_structures"],
     description_fr="Table de faits des postes/offres d'emploi dans les SIAE avec types de contrats, codes ROME et disponibilité (normalisée avec FK vers structures)."
 )
 class FactSIAEPostePipeline(SQLSilverV2Pipeline):
     """Transform SIAE postes data into normalized fact_siae_poste fact table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_v2_fact_siae_poste"
+        return "silver_fact_siae_poste"
     
     def get_target_table(self) -> str:
-        return "fact_siae_poste"
+        return "siae_postes"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze SIAE postes data with structure FK."""
@@ -55,6 +55,6 @@ class FactSIAEPostePipeline(SQLSilverV2Pipeline):
                 'silver_v2_fact_siae_poste' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM postes_with_rome p
-            LEFT JOIN silver_v2_dim_siae_structure s ON CAST(p.structure_id AS VARCHAR) = CAST(s.id AS VARCHAR)
+            LEFT JOIN silver_siae_structures s ON CAST(p.structure_id AS VARCHAR) = CAST(s.id AS VARCHAR)
             WHERE p.rome_code_extracted IS NOT NULL
         """

@@ -36,7 +36,7 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
         
         Reference bronze/silver_v2 tables, e.g.:
         - SELECT * FROM bronze_geo
-        - SELECT * FROM silver_v2_dim_commune
+        - SELECT * FROM silver_geo
         
         Returns:
             SQL query string
@@ -44,7 +44,7 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
         pass
     
     def run(self, force: bool = False) -> dict:
-        """Override run to use silver_v2 path."""
+        """Override run to write to silver path (cutover from silver_v2)."""
         try:
             logger.info(f"Running silver pipeline: {self.get_name()}")
             
@@ -52,9 +52,9 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
             logger.info("Transforming data")
             transformed_df = self.transform({})  # SQL pipelines don't use source_data parameter
             
-            # Write to silver_v2 table
+            # Write to silver table (cutover - write to production silver path)
             table_name = self.get_target_table()
-            target_path = self.settings.get_silver_v2_path(table_name)
+            target_path = self.settings.get_silver_path(table_name)
             logger.info(f"Writing {len(transformed_df)} rows to {target_path}")
             
             # Verify metadata columns
@@ -77,7 +77,7 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
                 mode="overwrite"  # For initial migration, overwrite
             )
             
-            logger.info(f"Successfully loaded data to silver_v2.{table_name}")
+            logger.info(f"Successfully loaded data to silver.{table_name}")
             
             return {
                 "status": "success",

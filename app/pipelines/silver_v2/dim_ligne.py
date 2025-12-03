@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 @register_pipeline(
-    layer="silver_v2",
-    name="dim_ligne",
+    layer="silver",
+    name="lignes",
     dependencies=["bronze.lignes"],
     description_fr="Table de dimension des lignes ferroviaires françaises avec tracés, catégories (TGV/classique) et points kilométriques."
 )
@@ -16,10 +16,10 @@ class DimLignePipeline(SQLSilverV2Pipeline):
     """Transform lignes data into normalized dim_ligne dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_v2_dim_ligne"
+        return "silver_dim_ligne"
     
     def get_target_table(self) -> str:
-        return "dim_ligne"
+        return "lignes"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze lignes data."""
