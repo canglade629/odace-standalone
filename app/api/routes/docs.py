@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 from app.core.auth import verify_api_key
+from pathlib import Path
 import os
 import logging
 
@@ -18,12 +19,18 @@ async def get_data_model_doc(api_key: str = Depends(verify_api_key)):
     Returns the markdown content with diagrams for the data model.
     """
     try:
-        doc_path = "DATA_MODEL.md"
+        # Calculate path relative to project root
+        # In development: /path/to/project/app/api/routes/docs.py -> /path/to/project/DATA_MODEL.md
+        # In Docker: /app/app/api/routes/docs.py -> /app/DATA_MODEL.md
+        project_root = Path(__file__).parent.parent.parent.parent
+        doc_path = project_root / "DATA_MODEL.md"
         
-        # Try to read from workspace root
-        if os.path.exists(doc_path):
+        logger.info(f"Looking for DATA_MODEL.md at: {doc_path}")
+        
+        if doc_path.exists():
             with open(doc_path, "r", encoding="utf-8") as f:
                 content = f.read()
+                logger.info(f"Successfully loaded DATA_MODEL.md ({len(content)} characters)")
                 return PlainTextResponse(content=content)
         else:
             logger.error(f"DATA_MODEL.md not found at {doc_path}")

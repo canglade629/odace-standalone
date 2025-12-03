@@ -28,6 +28,7 @@
             <button class="tab-button active" onclick="showTab('catalogue')">Catalogue</button>
             <button class="tab-button" onclick="showTab('pipelines')">Pipelines</button>
             <button class="tab-button" onclick="showTab('history')">History</button>
+            <button class="tab-button" onclick="showTab('logs')">Logs</button>
             <button class="tab-button" onclick="showTab('files')">Files</button>
             <button class="tab-button" onclick="showTab('data')">Data</button>
             <button class="tab-button" onclick="showTab('sql')">SQL Query</button>
@@ -87,6 +88,42 @@
                 </button>
             </div>
             <div id="job-history-list"></div>
+        </div>
+
+        <div id="logs" class="tab-content">
+            <div class="logs-header">
+                <h2>Pipeline Logs</h2>
+                <div class="logs-controls">
+                    <div class="control-group-inline">
+                        <label for="logJobSelector">Job:</label>
+                        <select id="logJobSelector" onchange="onLogJobChange()">
+                            <option value="">Select a job...</option>
+                        </select>
+                    </div>
+                    <div class="control-group-inline">
+                        <label for="logTaskFilter">Task:</label>
+                        <select id="logTaskFilter" onchange="loadSelectedJobLogs()">
+                            <option value="">All tasks</option>
+                        </select>
+                    </div>
+                    <div class="logs-actions">
+                        <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="btn btn-small btn-secondary">
+                            <span id="autoRefreshIcon">▶</span> Auto-refresh
+                        </button>
+                        <button onclick="clearLogsDisplay()" class="btn btn-small btn-secondary">Clear</button>
+                        <button onclick="loadSelectedJobLogs()" class="btn-icon" title="Refresh logs">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="terminal-container">
+                <div id="terminal-output" class="terminal-output">
+                    <div class="terminal-prompt">Select a job to view logs...</div>
+                </div>
+            </div>
         </div>
 
         <div id="files" class="tab-content">
@@ -300,6 +337,8 @@
                 loadJobHistory();
             } else if (tabName === 'pipelines') {
                 loadPipelines();
+            } else if (tabName === 'logs') {
+                loadLogsTab();
             } else if (tabName === 'files') {
                 listFiles();
             } else if (tabName === 'data') {
@@ -1537,6 +1576,232 @@
                 showStatus('Error loading documentation: ' + error.message, 'error');
             }
         }
+
+        // Logs Tab Functions
+        let logsAutoRefreshInterval = null;
+        let currentLogJobId = null;
+        let isAutoRefreshEnabled = false;
+
+        async function loadLogsTab() {
+            try {
+                // Load job list for selector
+                const response = await fetch(`${API_BASE}/api/jobs?limit=50`, {
+                    headers: getHeaders()
+                });
+                const data = await response.json();
+                
+                const selector = document.getElementById('logJobSelector');
+                
+                // Clear existing options except first
+                selector.innerHTML = '<option value="">Select a job...</option>';
+                
+                // Add jobs to selector
+                data.jobs.forEach(job => {
+                    const option = document.createElement('option');
+                    option.value = job.job_id;
+                    option.textContent = `${job.job_name} - ${formatDate(job.started_at)} (${job.status})`;
+                    selector.appendChild(option);
+                });
+                
+            } catch (error) {
+                showStatus('Error loading jobs: ' + error.message, 'error');
+            }
+        }
+
+        function onLogJobChange() {
+            const selector = document.getElementById('logJobSelector');
+            const jobId = selector.value;
+            
+            if (!jobId) {
+                clearLogsDisplay();
+                return;
+            }
+            
+            currentLogJobId = jobId;
+            
+            // Load tasks for this job to populate task filter
+            loadTasksForLogFilter(jobId);
+            
+            // Load logs
+            loadSelectedJobLogs();
+        }
+
+        async function loadTasksForLogFilter(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
+                    headers: getHeaders()
+                });
+                const jobData = await response.json();
+                
+                const taskFilter = document.getElementById('logTaskFilter');
+                taskFilter.innerHTML = '<option value="">All tasks</option>';
+                
+                if (jobData.tasks && jobData.tasks.length > 0) {
+                    jobData.tasks.forEach(task => {
+                        const option = document.createElement('option');
+                        option.value = task.task_id;
+                        option.textContent = `${task.layer}.${task.pipeline_name}`;
+                        taskFilter.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+
+        async function loadSelectedJobLogs() {
+            const jobId = currentLogJobId;
+            if (!jobId) return;
+            
+            const taskFilter = document.getElementById('logTaskFilter');
+            const taskId = taskFilter.value;
+            
+            await loadJobLogs(jobId, taskId);
+        }
+
+        async function loadJobLogs(jobId, taskId = null) {
+            const terminalOutput = document.getElementById('terminal-output');
+            
+            try {
+                // Build query params
+                let url = `${API_BASE}/api/jobs/${jobId}/logs?limit=1000`;
+                if (taskId) {
+                    url += `&task_id=${taskId}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: getHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Render logs
+                renderLogs(data.logs);
+                
+                // Check if job is still running - enable auto-refresh if so
+                const jobResponse = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
+                    headers: getHeaders()
+                });
+                const jobData = await jobResponse.json();
+                
+                if (jobData.status === 'running' || jobData.status === 'pending') {
+                    if (!isAutoRefreshEnabled) {
+                        // Suggest enabling auto-refresh for running jobs
+                        const btn = document.getElementById('autoRefreshBtn');
+                        if (btn && !btn.classList.contains('active')) {
+                            // Could auto-enable here, but let's keep it manual
+                        }
+                    }
+                } else {
+                    // Job completed, stop auto-refresh
+                    if (isAutoRefreshEnabled) {
+                        toggleAutoRefresh();
+                    }
+                }
+                
+            } catch (error) {
+                terminalOutput.innerHTML = `<div class="terminal-prompt" style="color: #f48771;">Error loading logs: ${error.message}</div>`;
+                showStatus('Error loading logs: ' + error.message, 'error');
+            }
+        }
+
+        function renderLogs(logs) {
+            const terminalOutput = document.getElementById('terminal-output');
+            
+            if (!logs || logs.length === 0) {
+                terminalOutput.innerHTML = '<div class="logs-empty">No logs available for this job.</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            logs.forEach(log => {
+                const timestamp = formatLogTimestamp(log.timestamp);
+                const level = log.level || 'INFO';
+                const message = escapeHtml(log.message || '');
+                
+                html += `<div class="log-entry">`;
+                html += `<span class="log-timestamp">${timestamp}</span>`;
+                html += `<span class="log-level log-level-${level}">[${level}]</span>`;
+                html += `<span class="log-message">${message}</span>`;
+                html += `</div>`;
+            });
+            
+            terminalOutput.innerHTML = html;
+            
+            // Auto-scroll to bottom
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function formatLogTimestamp(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            const ms = String(date.getMilliseconds()).padStart(3, '0');
+            return `${hours}:${minutes}:${seconds}.${ms}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function clearLogsDisplay() {
+            const terminalOutput = document.getElementById('terminal-output');
+            terminalOutput.innerHTML = '<div class="terminal-prompt">Select a job to view logs...</div>';
+            
+            const taskFilter = document.getElementById('logTaskFilter');
+            taskFilter.innerHTML = '<option value="">All tasks</option>';
+            
+            currentLogJobId = null;
+            
+            // Stop auto-refresh if active
+            if (isAutoRefreshEnabled) {
+                toggleAutoRefresh();
+            }
+        }
+
+        function toggleAutoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+            const icon = document.getElementById('autoRefreshIcon');
+            
+            isAutoRefreshEnabled = !isAutoRefreshEnabled;
+            
+            if (isAutoRefreshEnabled) {
+                btn.classList.add('active');
+                icon.textContent = '⏸';
+                
+                // Start auto-refresh
+                if (!logsAutoRefreshInterval) {
+                    logsAutoRefreshInterval = setInterval(() => {
+                        if (currentLogJobId) {
+                            loadSelectedJobLogs();
+                        }
+                    }, 3000); // Refresh every 3 seconds
+                }
+                
+                showStatus('Auto-refresh enabled', 'success');
+            } else {
+                btn.classList.remove('active');
+                icon.textContent = '▶';
+                
+                // Stop auto-refresh
+                if (logsAutoRefreshInterval) {
+                    clearInterval(logsAutoRefreshInterval);
+                    logsAutoRefreshInterval = null;
+                }
+                
+                showStatus('Auto-refresh disabled', 'info');
+            }
+        }
+
 
         // Load catalog on page load only if API key is set
         window.addEventListener('load', () => {

@@ -9,6 +9,7 @@ from enum import Enum
 from app.core.pipeline_registry import get_registry
 from app.core.models import PipelineLayer, PipelineStatus
 from app.core.job_manager import get_job_manager, Job, Task, JobStatus, TaskStatus
+from app.core.log_capture import LogCaptureContext
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +177,17 @@ class PipelineExecutor:
             self.job_manager.update_task(job_id, task)
         
         try:
-            # Instantiate and run pipeline
+            # Instantiate and run pipeline with log capture
             pipeline = pipeline_class()
-            result = await asyncio.to_thread(pipeline.run, force=force)
+            
+            # Capture logs if part of a job
+            if job_id:
+                with LogCaptureContext(job_id, run_id):
+                    logger.info(f"Starting pipeline {layer.value}.{name}")
+                    result = await asyncio.to_thread(pipeline.run, force=force)
+                    logger.info(f"Completed pipeline {layer.value}.{name}")
+            else:
+                result = await asyncio.to_thread(pipeline.run, force=force)
             
             # Map result status to pipeline/task status
             result_status = result.get("status", "success")

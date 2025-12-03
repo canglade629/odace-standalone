@@ -1675,3 +1675,218 @@ button, .btn {
     }
 }
 
+/* Logs Tab Styles */
+.logs-header {
+    background: var(--bg-secondary);
+    padding: 20px 30px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+}
+
+.logs-header h2 {
+    margin: 0 0 15px 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.logs-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group-inline label {
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.control-group-inline select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    min-width: 200px;
+}
+
+.control-group-inline select:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--bg-secondary);
+}
+
+.logs-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Terminal Container */
+.terminal-container {
+    background: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    border: 1px solid #333;
+}
+
+.terminal-output {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding: 20px;
+    min-height: 500px;
+    max-height: 70vh;
+    overflow-y: auto;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.terminal-output::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.terminal-output::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.terminal-output::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 5px;
+}
+
+.terminal-output::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+.terminal-prompt {
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.log-entry {
+    margin-bottom: 2px;
+    padding: 2px 0;
+}
+
+.log-timestamp {
+    color: #808080;
+    margin-right: 8px;
+}
+
+.log-level {
+    font-weight: 600;
+    margin-right: 8px;
+    min-width: 60px;
+    display: inline-block;
+}
+
+.log-level-DEBUG {
+    color: #888888;
+}
+
+.log-level-INFO {
+    color: #4ec9b0;
+}
+
+.log-level-WARNING {
+    color: #dcdcaa;
+}
+
+.log-level-ERROR {
+    color: #f48771;
+}
+
+.log-level-CRITICAL {
+    color: #f44336;
+    font-weight: 700;
+}
+
+.log-message {
+    color: #d4d4d4;
+}
+
+.log-separator {
+    color: #555;
+    margin: 10px 0;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+}
+
+/* Auto-refresh button states */
+#autoRefreshBtn.active {
+    background: var(--success);
+    color: white;
+}
+
+#autoRefreshBtn.active:hover {
+    background: #45a049;
+}
+
+#autoRefreshIcon {
+    display: inline-block;
+    font-size: 0.8rem;
+}
+
+/* Loading indicator for logs */
+.logs-loading {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+    font-style: italic;
+}
+
+/* Empty state */
+.logs-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #888;
+    font-style: italic;
+}
+
+/* Responsive logs */
+@media (max-width: 768px) {
+    .logs-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-group-inline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-group-inline select {
+        width: 100%;
+    }
+    
+    .logs-actions {
+        margin-left: 0;
+        justify-content: space-between;
+    }
+    
+    .terminal-output {
+        font-size: 0.8rem;
+        min-height: 400px;
+        max-height: 60vh;
+    }
+}
+
