@@ -1,6 +1,4 @@
 ---
-description: When trying to run actions on GCP
-alwaysApply: false
+alwaysApply: true
 ---
-
 Use my GCP CLI on project icc-project-472009. Remember that I want only to use GCS bucket and Cloud run for minimal cost (you should be able to keep that way below $5 per month)

@@ -12,7 +12,8 @@ from app.core.pipeline_registry import register_pipeline
 logger = logging.getLogger(__name__)
 
 
-@register_pipeline(layer="bronze", name="open_data")
+# DO NOT register this as a pipeline - it's a base class for specific resource pipelines
+# Use BronzeGaresPipeline, BronzeLignesPipeline etc instead
 class BronzeOpenDataPipeline(BaseAPIBronzePipeline):
     """
     Generic bronze pipeline for ingesting data from data.gouv.fr tabular API.

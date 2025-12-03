@@ -1,22 +1,9 @@
-"""Silver layer pipelines - Now using V2 implementations."""
-# Import from silver_v2 but expose as silver layer for backward compatibility
-from app.pipelines.silver_v2.dim_commune import DimCommunePipeline as SilverGeoPipeline
-from app.pipelines.silver_v2.dim_accueillant import DimAccueillantPipeline as SilverAccueillantsPipeline
-from app.pipelines.silver_v2.dim_gare import DimGarePipeline as SilverGaresPipeline
-from app.pipelines.silver_v2.dim_ligne import DimLignePipeline as SilverLignesPipeline
-from app.pipelines.silver_v2.dim_siae_structure import DimSIAEStructurePipeline as SilverSIAEStructuresPipeline
-from app.pipelines.silver_v2.fact_logement import FactLogementPipeline as SilverLogementPipeline
-from app.pipelines.silver_v2.fact_zone_attraction import FactZoneAttractionPipeline as SilverZonesAttractionPipeline
-from app.pipelines.silver_v2.fact_siae_poste import FactSIAEPostePipeline as SilverSIAEPostesPipeline
+"""Silver layer pipelines - Cleaned and standardized dimension and fact tables.
 
-__all__ = [
-    "SilverAccueillantsPipeline",
-    "SilverGeoPipeline",
-    "SilverGaresPipeline",
-    "SilverLignesPipeline",
-    "SilverLogementPipeline",
-    "SilverZonesAttractionPipeline",
-    "SilverSIAEStructuresPipeline",
-    "SilverSIAEPostesPipeline",
-]
-
+This module contains pipelines for the silver layer which implements:
+- Proper naming conventions (dim_* for dimensions, fact_* for facts)
+- Surrogate keys (_sk) on all tables
+- Metadata columns (job_insert_id, job_insert_date_utc, job_modify_id, job_modify_date_utc)
+- Normalized schema with proper foreign key relationships
+- SQL-based transformations via DuckDB for maintainability
+"""

@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for dim_ligne - Railway lines dimension (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for dim_ligne - Railway lines dimension (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,18 +8,18 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="lignes",
+    name="dim_ligne",
     dependencies=["bronze.lignes"],
-    description_fr="Table de dimension des lignes ferroviaires françaises avec tracés, catégories (TGV/classique) et points kilométriques."
+    description_fr="Table de dimension des lignes ferroviaires avec tronçons, catégories (TGV/non-TGV) et coordonnées de début/fin."
 )
 class DimLignePipeline(SQLSilverV2Pipeline):
     """Transform lignes data into normalized dim_ligne dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_dim_ligne"
+        return "dim_ligne"
     
     def get_target_table(self) -> str:
-        return "lignes"
+        return "dim_ligne"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze lignes data."""
@@ -37,14 +37,17 @@ class DimLignePipeline(SQLSilverV2Pipeline):
                 lib_ligne AS ligne_label,
                 catlig AS categorie,
                 is_tgv,
-                CAST(rg_troncon AS INTEGER) AS rg_troncon,
+                rg_troncon,
                 pkd, pkf, idgaia,
                 x_d_l93, y_d_l93, x_f_l93, y_f_l93,
                 x_d_wgs84, y_d_wgs84, x_f_wgs84, y_f_wgs84,
-                c_geo_d, c_geo_f, geo_point, geo_shape, ingestion_timestamp,
-                'silver_v2_dim_ligne' AS job_insert_id,
+                c_geo_d, c_geo_f, 
+                geo_point,
+                geo_shape_type, geo_shape_coordinates,
+                ingestion_timestamp,
+                'dim_ligne' AS job_insert_id,
                 CURRENT_TIMESTAMP AS job_insert_date_utc,
-                'silver_v2_dim_ligne' AS job_modify_id,
+                'dim_ligne' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM deduplicated
             WHERE rn = 1

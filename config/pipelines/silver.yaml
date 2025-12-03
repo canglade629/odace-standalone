@@ -1,0 +1,52 @@
+# Silver Layer Pipeline Configuration
+# Cleaned and standardized dimension and fact tables
+
+pipelines:
+  - name: "dim_commune"
+    target_table: "dim_commune"
+    dependencies: ["bronze.geo"]
+    pipeline_class: "app.pipelines.silver.dim_commune.DimCommunePipeline"
+    description_fr: "Table de dimension des communes françaises avec codes INSEE, départements et régions. Master Data Management (MDM) pour toutes les jointures géographiques."
+    
+  - name: "dim_accueillant"
+    target_table: "dim_accueillant"
+    dependencies: ["bronze.accueillants", "silver.dim_commune"]
+    pipeline_class: "app.pipelines.silver.dim_accueillant.DimAccueillantPipeline"
+    description_fr: "Table de dimension des structures d'accueil avec enrichissement géographique (FK vers dim_commune) et coordonnées GPS."
+    
+  - name: "dim_gare"
+    target_table: "dim_gare"
+    dependencies: ["bronze.gares", "silver.dim_commune"]
+    pipeline_class: "app.pipelines.silver.dim_gare.DimGarePipeline"
+    description_fr: "Table de dimension des gares voyageurs avec enrichissement géographique (FK vers dim_commune), codes UIC et coordonnées GPS."
+    
+  - name: "dim_ligne"
+    target_table: "dim_ligne"
+    dependencies: ["bronze.lignes"]
+    pipeline_class: "app.pipelines.silver.dim_ligne.DimLignePipeline"
+    description_fr: "Table de dimension des lignes ferroviaires avec tronçons, catégories (TGV/non-TGV) et coordonnées de début/fin."
+    
+  - name: "dim_siae_structure"
+    target_table: "dim_siae_structure"
+    dependencies: ["bronze.siae_structures", "silver.dim_commune"]
+    pipeline_class: "app.pipelines.silver.dim_siae_structure.DimSIAEStructurePipeline"
+    description_fr: "Table de dimension des structures d'insertion par l'activité économique (SIAE) avec enrichissement géographique (FK vers dim_commune) et informations de contact."
+    
+  - name: "fact_logement"
+    target_table: "fact_logement"
+    dependencies: ["bronze.logement", "silver.dim_commune"]
+    pipeline_class: "app.pipelines.silver.fact_logement.FactLogementPipeline"
+    description_fr: "Table de faits des loyers prédits au m² par commune avec bornes de prédiction et niveau de qualité. FK vers dim_commune."
+    
+  - name: "fact_zone_attraction"
+    target_table: "fact_zone_attraction"
+    dependencies: ["bronze.zones_attraction", "silver.dim_commune"]
+    pipeline_class: "app.pipelines.silver.fact_zone_attraction.FactZoneAttractionPipeline"
+    description_fr: "Table de faits des aires d'attraction des villes 2020 avec FKs vers communes (commune et pôle) et catégories d'attraction."
+    
+  - name: "fact_siae_poste"
+    target_table: "fact_siae_poste"
+    dependencies: ["bronze.siae_postes", "silver.dim_siae_structure"]
+    pipeline_class: "app.pipelines.silver.fact_siae_poste.FactSIAEPostePipeline"
+    description_fr: "Table de faits des postes ouverts en SIAE avec codes ROME, types de contrats et disponibilité. FK vers dim_siae_structure."
+

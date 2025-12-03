@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for dim_commune - Geographic dimension table (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for dim_commune - Geographic dimension table (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="geo",
+    name="dim_commune",
     dependencies=["bronze.geo"],
     description_fr="Table de dimension des communes françaises avec codes INSEE, départements et régions. Master Data Management (MDM) pour toutes les jointures géographiques."
 )
@@ -16,10 +16,10 @@ class DimCommunePipeline(SQLSilverV2Pipeline):
     """Transform geo data into normalized dim_commune dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_geo"
+        return "dim_commune"
     
     def get_target_table(self) -> str:
-        return "geo"
+        return "dim_commune"
     
     def get_sql_query(self) -> str:
         """
@@ -32,8 +32,18 @@ class DimCommunePipeline(SQLSilverV2Pipeline):
         - departement_code: Extracted from first 2-3 chars of INSEE code
         - region_code: Mapped from department code
         - 4 metadata columns
+        
+        Deduplicates by keeping only the latest record per code_insee.
         """
         return """
+            WITH deduplicated AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (PARTITION BY code_insee ORDER BY ingestion_timestamp DESC) AS rn
+                FROM bronze_geo
+                WHERE code_insee IS NOT NULL 
+                  AND code_insee != 'nan'
+                  AND code_insee != ''
+            )
             SELECT 
                 MD5(code_insee) as commune_sk,
                 code_insee as commune_code,
@@ -86,8 +96,6 @@ class DimCommunePipeline(SQLSilverV2Pipeline):
                 CURRENT_TIMESTAMP as job_insert_date_utc,
                 'silver_geo' as job_modify_id,
                 CURRENT_TIMESTAMP as job_modify_date_utc
-            FROM bronze_geo
-            WHERE code_insee IS NOT NULL 
-              AND code_insee != 'nan'
-              AND code_insee != ''
+            FROM deduplicated
+            WHERE rn = 1
         """

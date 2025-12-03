@@ -283,21 +283,48 @@ class BaseAPIBronzePipeline(BaseBronzePipeline):
     
     def read_source_file(self, file_path: str) -> pd.DataFrame:
         """
-        Override to fetch data from API instead of reading a file.
+        Read data for API pipeline with smart caching:
+        1. Check if raw files exist in GCS -> use them
+        2. If no raw files, fetch from API and save to raw
         
         Args:
-            file_path: Ignored for API pipelines
+            file_path: Path marker (for API pipelines, indicates whether to fetch)
             
         Returns:
-            pandas DataFrame with API data
+            pandas DataFrame with data
         """
-        logger.info(f"Fetching data from API endpoint: {self.get_api_endpoint()}")
+        table_name = self.get_target_table()
+        raw_base_path = f"{self.settings.raw_path}/api/{table_name}"
+        
+        # Check if raw files already exist
+        try:
+            logger.info(f"Checking for existing raw files in {raw_base_path}")
+            raw_files = self.gcs.list_files(raw_base_path, pattern="*.json")
+            
+            if raw_files:
+                # Use the most recent raw file
+                latest_raw_file = sorted(raw_files)[-1]
+                logger.info(f"Found existing raw file: {latest_raw_file}. Using cached data (skip API call).")
+                
+                # Read from raw file
+                import json
+                raw_content = self.gcs.download_file(latest_raw_file)
+                records = json.loads(raw_content)
+                
+                # Convert to DataFrame
+                df = self.normalize_json_to_dataframe(records)
+                return df
+                
+        except Exception as e:
+            logger.info(f"No raw files found or error reading them: {e}")
+        
+        # No raw files exist - fetch from API
+        logger.info(f"No cached data found. Fetching fresh data from API: {self.get_api_endpoint()}")
         
         # Fetch data asynchronously
         records = asyncio.run(self.fetch_all_data())
         
         # Save raw data to GCS raw layer
-        table_name = self.get_target_table()
         self.save_raw_data(records, table_name)
         
         # Convert to DataFrame
@@ -307,29 +334,46 @@ class BaseAPIBronzePipeline(BaseBronzePipeline):
     
     def get_new_files(self, force: bool = False) -> List[str]:
         """
-        Override to return a single marker for API fetch.
+        Determine if API pipeline should process data.
         
-        API pipelines always fetch fresh data (no files to track).
+        Logic (smart caching):
+        1. If force=True: Always process (will trigger API fetch via read_source_file)
+        2. Check bronze table:
+           - If exists with data: Skip (bronze cache hit)
+           - If doesn't exist or empty: Process (will check raw, then API in read_source_file)
         
         Args:
-            force: If True, force refetch
+            force: If True, force reprocessing (triggers fresh API fetch)
             
         Returns:
-            List with single marker string
+            List with single marker string, or empty list if no processing needed
         """
         # For API sources, we use a timestamp-based marker
         marker = f"api_fetch_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         
         if force:
-            logger.info("Force mode: fetching fresh data from API")
+            logger.info("Force mode: will fetch fresh data from API")
             return [marker]
         
-        # Check checkpoint to see if we should fetch
-        # For daily updates, we could check if we already fetched today
-        checkpoint_name = self.get_name()
+        # Check if bronze table already exists
+        table_name = self.get_target_table()
+        target_path = self.settings.get_bronze_path(table_name)
         
-        # For now, always fetch (can be refined later with checkpoint logic)
-        return [marker]
+        try:
+            from app.utils.delta_ops import DeltaOperations
+            table_info = DeltaOperations.get_table_schema(target_path)
+            row_count = table_info.get("row_count", 0)
+            
+            if row_count > 0:
+                logger.info(f"Bronze table {table_name} already exists with {row_count} rows. Skipping processing.")
+                return []  # Skip - bronze cache hit
+            else:
+                logger.info(f"Bronze table {table_name} exists but is empty. Processing (will check raw cache).")
+                return [marker]
+                
+        except Exception as e:
+            logger.info(f"Bronze table {table_name} not found ({e}). Processing (will check raw cache, then API).")
+            return [marker]
     
     def get_write_mode(self) -> str:
         """

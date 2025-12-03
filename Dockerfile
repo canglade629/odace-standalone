@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy documentation
 COPY DATA_MODEL.md .
 
+# Copy configuration files
+COPY config/ ./config/
+
 # Copy application code
 COPY app/ ./app/
 

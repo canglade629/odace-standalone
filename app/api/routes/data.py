@@ -87,6 +87,7 @@ class QueryResponse(BaseModel):
 class SilverTableInfo(BaseModel):
     """Silver table information with French description."""
     name: str
+    actual_table_name: str  # The actual Delta table name (e.g., dim_commune)
     description_fr: str
     dependencies: List[str]
     version: int
@@ -113,7 +114,7 @@ async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
     """
     Get the complete data catalog with all schemas and tables.
     
-    Scans GCS for Delta tables in bronze, silver, silver_v2, and gold layers.
+    Scans GCS for Delta tables in bronze, silver, and gold layers.
     """
     logger.info("Fetching data catalog")
     settings = get_settings()
@@ -121,8 +122,8 @@ async def get_catalog(request: Request, api_key: str = Depends(verify_api_key)):
     try:
         schemas = {}
         
-        # Scan each layer (including silver_v2)
-        for layer in ["bronze", "silver", "silver_v2", "gold"]:
+        # Scan each layer
+        for layer in ["bronze", "silver", "gold"]:
             layer_path = f"{settings.delta_path}/{layer}"
             try:
                 tables = DeltaOperations.list_delta_tables(layer_path)
@@ -152,7 +153,7 @@ async def get_silver_catalog(request: Request, api_key: str = Depends(verify_api
     Get catalog of silver tables with French descriptions.
     
     Returns all silver layer tables with their French descriptions, dependencies,
-    and basic metadata.
+    and basic metadata. Uses direct table names (dim_*, fact_*).
     """
     logger.info("Fetching silver catalog with French descriptions")
     settings = get_settings()
@@ -162,16 +163,21 @@ async def get_silver_catalog(request: Request, api_key: str = Depends(verify_api
         # Get all silver pipelines from registry
         silver_pipelines = registry.list_pipelines(layer=PipelineLayer.SILVER)
         
-        # Get Delta table information
+        # Get Delta table information from silver directory
         layer_path = f"{settings.delta_path}/silver"
-        delta_tables = {t["name"]: t for t in DeltaOperations.list_delta_tables(layer_path)}
+        try:
+            delta_tables = {t["name"]: t for t in DeltaOperations.list_delta_tables(layer_path)}
+        except Exception as e:
+            logger.warning(f"Could not list tables in silver: {e}")
+            delta_tables = {}
         
         tables = []
         for pipeline in silver_pipelines:
+            # Pipeline name is now the same as the table name (dim_*, fact_*)
             table_name = pipeline.name
             delta_info = delta_tables.get(table_name, {})
             
-            # Get row count if available
+            # Get row count from table
             row_count = None
             try:
                 table_path = f"{layer_path}/{table_name}"
@@ -182,6 +188,7 @@ async def get_silver_catalog(request: Request, api_key: str = Depends(verify_api
             
             tables.append(SilverTableInfo(
                 name=table_name,
+                actual_table_name=table_name,
                 description_fr=pipeline.description_fr or "Description non disponible",
                 dependencies=pipeline.dependencies,
                 version=delta_info.get("version", 0),
@@ -223,7 +230,7 @@ async def get_silver_table_detail(
         if not pipeline_info:
             raise HTTPException(status_code=404, detail=f"Table {table_name} not found in registry")
         
-        # Get table schema
+        # Get table schema from silver directory
         table_path = f"{settings.delta_path}/silver/{table_name}"
         schema_info = DeltaOperations.get_table_schema(table_path)
         
@@ -277,15 +284,15 @@ async def get_table_metadata(
     Get metadata for a specific table including schema and row count.
     
     Args:
-        layer: Layer name (bronze, silver, silver_v2, gold)
+        layer: Layer name (bronze, silver, gold)
         table: Table name
     """
     logger.info(f"Fetching metadata for {layer}.{table}")
     settings = get_settings()
     
-    # Validate layer (including silver_v2)
-    if layer not in ["bronze", "silver", "silver_v2", "gold"]:
-        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, silver_v2, or gold")
+    # Validate layer
+    if layer not in ["bronze", "silver", "gold"]:
+        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, or gold")
     
     # Construct table path
     table_path = f"{settings.delta_path}/{layer}/{table}"
@@ -325,16 +332,16 @@ async def preview_table(
     Get a preview of table data with optional filtering and sorting.
     
     Args:
-        layer: Layer name (bronze, silver, silver_v2, gold)
+        layer: Layer name (bronze, silver, gold)
         table: Table name
         preview_req: Preview request with filters and sort options
     """
     logger.info(f"Previewing {layer}.{table} with filters={preview_req.filters}, sort={preview_req.sort_by}")
     settings = get_settings()
     
-    # Validate layer (including silver_v2)
-    if layer not in ["bronze", "silver", "silver_v2", "gold"]:
-        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, silver_v2, or gold")
+    # Validate layer
+    if layer not in ["bronze", "silver", "gold"]:
+        raise HTTPException(status_code=400, detail="Layer must be bronze, silver, or gold")
     
     # Construct table path
     table_path = f"{settings.delta_path}/{layer}/{table}"
@@ -391,11 +398,11 @@ async def execute_sql_query(
     try:
         start_time = time.time()
         
-        # Register all Delta tables from all layers (including silver_v2)
+        # Register all Delta tables from all layers
         registered_tables = []
         registration_errors = []
         
-        for layer in ["bronze", "silver", "silver_v2", "gold"]:
+        for layer in ["bronze", "silver", "gold"]:
             layer_path = f"{settings.delta_path}/{layer}"
             try:
                 tables = DeltaOperations.list_delta_tables(layer_path)

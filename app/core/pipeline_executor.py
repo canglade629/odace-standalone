@@ -55,6 +55,7 @@ class PipelineExecutor:
         self.execution_history: Dict[str, PipelineExecutionState] = {}
         self.job_manager = get_job_manager()
         self.current_job_id: Optional[str] = None
+        self.cancelled_jobs: Set[str] = set()  # Track cancelled job IDs
     
     def _resolve_dependencies(
         self,
@@ -138,6 +139,13 @@ class PipelineExecutor:
         state = PipelineExecutionState(run_id, name, layer)
         self.execution_history[run_id] = state
         
+        # Check if job is cancelled before starting
+        if job_id and job_id in self.cancelled_jobs:
+            logger.info(f"Skipping pipeline {layer.value}.{name} - job {job_id} is cancelled")
+            state.status = PipelineStatus.FAILED
+            state.error = "Job cancelled"
+            return state
+        
         logger.info(f"Executing pipeline: {layer.value}.{name} (run_id={run_id})")
         
         # Create task in job if job_id provided
@@ -184,10 +192,19 @@ class PipelineExecutor:
             if job_id:
                 with LogCaptureContext(job_id, run_id):
                     logger.info(f"Starting pipeline {layer.value}.{name}")
+                    
+                    # Check for cancellation before running
+                    if job_id in self.cancelled_jobs:
+                        raise Exception("Job cancelled by user")
+                    
                     result = await asyncio.to_thread(pipeline.run, force=force)
                     logger.info(f"Completed pipeline {layer.value}.{name}")
             else:
                 result = await asyncio.to_thread(pipeline.run, force=force)
+            
+            # Check for cancellation after running
+            if job_id and job_id in self.cancelled_jobs:
+                raise Exception("Job cancelled by user")
             
             # Map result status to pipeline/task status
             result_status = result.get("status", "success")
@@ -222,15 +239,18 @@ class PipelineExecutor:
             state.error = str(e)
             state.completed_at = datetime.utcnow()
             
+            # Determine if this was a cancellation
+            is_cancelled = job_id and job_id in self.cancelled_jobs
+            
             # Update task on failure
             if job_id:
-                task.status = TaskStatus.FAILED
+                task.status = TaskStatus.CANCELLED if is_cancelled else TaskStatus.FAILED
                 task.error = str(e)
                 task.completed_at = state.completed_at
                 task.duration_seconds = (state.completed_at - state.started_at).total_seconds()
                 self.job_manager.update_task(job_id, task)
             
-            logger.error(f"Pipeline {layer.value}.{name} failed: {e}", exc_info=True)
+            logger.error(f"Pipeline {layer.value}.{name} failed: {e}", exc_info=not is_cancelled)
         
         return state
     
@@ -267,6 +287,11 @@ class PipelineExecutor:
         # Execute each pipeline in order
         results = []
         for exec_layer, exec_name in execution_order:
+            # Check for cancellation before starting next pipeline
+            if job_id and job_id in self.cancelled_jobs:
+                logger.info(f"Job {job_id} cancelled, stopping execution")
+                break
+            
             state = await self.execute_pipeline(exec_layer, exec_name, force=force, job_id=job_id)
             results.append(state)
             
@@ -334,6 +359,11 @@ class PipelineExecutor:
                 bronze_pipelines = self.registry.list_pipelines(PipelineLayer.BRONZE)
                 
                 for pipeline_info in bronze_pipelines:
+                    # Check for cancellation
+                    if job_id in self.cancelled_jobs:
+                        logger.info(f"Job {job_id} cancelled, stopping execution")
+                        break
+                    
                     state = await self.execute_pipeline(
                         PipelineLayer.BRONZE,
                         pipeline_info.name,
@@ -360,12 +390,28 @@ class PipelineExecutor:
                     if state.status == PipelineStatus.FAILED:
                         break
             
+            # Check for cancellation before starting silver layer
+            if job_id in self.cancelled_jobs:
+                logger.info(f"Job {job_id} cancelled before silver layer")
+                # Mark as cancelled
+                self.job_manager.update_job_progress(
+                    job_id,
+                    status=JobStatus.CANCELLED,
+                    completed_at=datetime.utcnow()
+                )
+                return job_id, results
+            
             # Run silver layer (only if no failures in bronze and not bronze_only)
             if not bronze_only and failed == 0:
                 logger.info("Running all silver pipelines")
                 silver_pipelines = self.registry.list_pipelines(PipelineLayer.SILVER)
                 
                 for pipeline_info in silver_pipelines:
+                    # Check for cancellation
+                    if job_id in self.cancelled_jobs:
+                        logger.info(f"Job {job_id} cancelled, stopping execution")
+                        break
+                    
                     # In full pipeline mode, bronze is already run, so don't re-run dependencies
                     # Just run the silver pipeline directly
                     state = await self.execute_pipeline(
@@ -395,8 +441,12 @@ class PipelineExecutor:
                         break
             
             # Determine final job status
+            # Check if job was cancelled
+            if job_id in self.cancelled_jobs:
+                final_status = JobStatus.CANCELLED
+                self.cancelled_jobs.remove(job_id)  # Clean up
             # If any task failed, the entire job is considered failed
-            if failed > 0:
+            elif failed > 0:
                 final_status = JobStatus.FAILED
             else:
                 final_status = JobStatus.SUCCESS
@@ -451,6 +501,40 @@ class PipelineExecutor:
         )
         
         return [state.to_dict() for state in sorted_executions[:limit]]
+    
+    def cancel_job(self, job_id: str) -> bool:
+        """
+        Cancel a running job.
+        
+        Args:
+            job_id: Job ID to cancel
+            
+        Returns:
+            True if job was marked for cancellation, False otherwise
+        """
+        # Check if job exists and is running
+        job_data = self.job_manager.get_job(job_id)
+        if not job_data:
+            logger.error(f"Job {job_id} not found")
+            return False
+        
+        status = job_data.get("status")
+        if status not in ["pending", "running"]:
+            logger.error(f"Job {job_id} is not running (status: {status})")
+            return False
+        
+        # Mark job for cancellation
+        self.cancelled_jobs.add(job_id)
+        logger.info(f"Job {job_id} marked for cancellation")
+        
+        # Update job status immediately to show it's being cancelled
+        self.job_manager.update_job_progress(
+            job_id,
+            status=JobStatus.CANCELLED,
+            completed_at=datetime.utcnow()
+        )
+        
+        return True
 
 
 # Global executor instance

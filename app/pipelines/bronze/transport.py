@@ -176,6 +176,8 @@ class BronzeLignesPipeline(BaseAPIBronzePipeline):
     
     def transform(self, df: pd.DataFrame, file_path: str) -> pd.DataFrame:
         """Normalize column names and convert types to match Databricks schema."""
+        import json
+        
         # Normalize column names: lowercase, replace non-alphanumeric with underscores
         normalized_cols = [re.sub(r'[^a-zA-Z0-9]', '_', c).lower() for c in df.columns]
         df.columns = normalized_cols
@@ -183,6 +185,21 @@ class BronzeLignesPipeline(BaseAPIBronzePipeline):
         # Convert code_ligne to string to match Databricks schema
         if 'code_ligne' in df.columns:
             df['code_ligne'] = df['code_ligne'].astype(str)
+        
+        # Fix geo_shape_coordinates - convert nested lists to JSON string for Delta compatibility
+        if 'geo_shape_coordinates' in df.columns:
+            def serialize_coords(x):
+                if x is None:
+                    return None
+                try:
+                    # Check if it's a scalar NaN (not an array)
+                    if isinstance(x, float) and pd.isna(x):
+                        return None
+                    return json.dumps(x)
+                except (TypeError, ValueError):
+                    return None
+            
+            df['geo_shape_coordinates'] = df['geo_shape_coordinates'].apply(serialize_coords)
         
         # Add ingestion timestamp
         df = super().transform(df, file_path)

@@ -471,11 +471,10 @@ GROUP BY s.city, s.insee_code
 ## Additional Documentation
 
 For developers and administrators:
+- **[Pipeline Configuration Guide](docs/PIPELINE_CONFIGURATION.md)** - Complete guide to YAML-based pipeline configuration
 - [API Key Management](docs/API_KEY_USAGE.md) - Complete guide to API key creation and management
-- [SIAE Data Exploration](SIAE_DATA_EXPLORATION.md) - Detailed SIAE data analysis and schema design
+- [Data Model Reference](DATA_MODEL.md) - Silver layer schema and table relationships
 - [Implementation Details](docs/IMPLEMENTATION_SUMMARY.md) - Technical architecture and design
-- [Pipeline Fixes](docs/PIPELINE_FIXES_SUMMARY.md) - Pipeline development notes
-- [Test Reports](docs/END_TO_END_TEST_REPORT.md) - Testing documentation
 
 ## API Key Management for Administrators
 

@@ -221,7 +221,7 @@ Most tables connect through the **`geo`** table using `commune_sk`:
                     │     geo     │
                     │ (commune_sk)│
                     └──────┬──────┘
-                           │
+                             │
          ┌─────────────────┼─────────────────┐
          │                 │                 │
          ▼                 ▼                 ▼
@@ -229,8 +229,8 @@ Most tables connect through the **`geo`** table using `commune_sk`:
   │ logement │      │  gares   │    │    siae      │
   └──────────┘      └──────────┘    │  structures  │
                                      └──────┬───────┘
-                                            │
-                                            ▼
+                             │
+                             ▼
                                     ┌──────────────┐
                                     │    siae      │
                                     │   postes     │

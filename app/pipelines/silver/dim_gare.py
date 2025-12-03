@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for dim_gare - Train stations dimension (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for dim_gare - Train stations dimension (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,18 +8,18 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="gares",
-    dependencies=["bronze.gares", "silver.geo"],
-    description_fr="Table de dimension des gares ferroviaires françaises avec codes UIC, services (fret/voyageurs) et enrichissement géographique."
+    name="dim_gare",
+    dependencies=["bronze.gares", "silver.dim_commune"],
+    description_fr="Table de dimension des gares voyageurs avec enrichissement géographique (FK vers dim_commune), codes UIC et coordonnées GPS."
 )
 class DimGarePipeline(SQLSilverV2Pipeline):
     """Transform gares data into normalized dim_gare dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_dim_gare"
+        return "dim_gare"
     
     def get_target_table(self) -> str:
-        return "gares"
+        return "dim_gare"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze gares data with geographic enrichment."""
@@ -54,11 +54,11 @@ class DimGarePipeline(SQLSilverV2Pipeline):
                 COALESCE(CAST(d.geo_shape_coordinates AS VARCHAR), '') AS geo_shape_coordinates,
                 COALESCE(CAST(d.geo_shape_type AS VARCHAR), '') AS geo_shape_type,
                 CAST(d.ingestion_timestamp AS TIMESTAMP) AS ingestion_timestamp,
-                'silver_v2_dim_gare' AS job_insert_id,
+                'dim_gare' AS job_insert_id,
                 CURRENT_TIMESTAMP AS job_insert_date_utc,
-                'silver_v2_dim_gare' AS job_modify_id,
+                'dim_gare' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM deduplicated d
-            LEFT JOIN silver_geo c ON d.c_geo = c.commune_code
+            LEFT JOIN silver_dim_commune c ON d.c_geo = c.commune_code
             WHERE rn = 1
         """

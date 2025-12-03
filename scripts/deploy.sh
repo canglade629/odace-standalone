@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deployment script for Odace Data Pipeline
+# Deployment script for Odace Data Pipeline using local Docker
 
 set -e
 
@@ -24,8 +24,8 @@ gcloud config set project ${PROJECT_ID}
 echo "🔑 Configuring Docker authentication..."
 gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
 
-# Build Docker image for AMD64 (Cloud Run requirement)
-echo "🏗️  Building Docker image for AMD64..."
+# Build Docker image locally for AMD64 (Cloud Run requirement)
+echo "🏗️  Building Docker image locally for AMD64..."
 IMAGE_NAME="${ARTIFACT_REGISTRY}/${PROJECT_ID}/${REPOSITORY}/${SERVICE_NAME}"
 IMAGE_TAG="latest"
 FULL_IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
@@ -59,7 +59,8 @@ echo "✅ Deployment complete!"
 echo "🌐 Service URL: ${SERVICE_URL}"
 echo ""
 echo "Next steps:"
-echo "1. Generate API keys for users: python scripts/manage_api_keys.py create user@example.com"
-echo "2. Visit ${SERVICE_URL}/docs for API documentation"
-echo "3. Test authentication with: curl -H 'Authorization: Bearer sk_live_...' ${SERVICE_URL}/health"
+echo "1. Test health: curl ${SERVICE_URL}/health"
+echo "2. Test API: curl -H 'Authorization: Bearer YOUR_API_KEY' ${SERVICE_URL}/api/pipeline/list"
+echo "3. Visit ${SERVICE_URL}/docs for API documentation"
+
 

@@ -20,23 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Import all pipeline modules to trigger registration
-import app.pipelines.bronze.accueillants
-import app.pipelines.bronze.geo
-import app.pipelines.bronze.logement
-import app.pipelines.bronze.transport
-import app.pipelines.bronze.zones_attraction
-import app.pipelines.bronze.siae_postes
-import app.pipelines.bronze.siae_structures
-import app.pipelines.silver.accueillants
-import app.pipelines.silver.geo
-import app.pipelines.silver.gares
-import app.pipelines.silver.lignes
-import app.pipelines.silver.logement
-import app.pipelines.silver.zones_attraction
-import app.pipelines.silver.siae_structures
-import app.pipelines.silver.siae_postes
-
 # Create FastAPI app
 app = FastAPI(
     title="Odace Data Pipeline API",
@@ -103,16 +86,32 @@ async def startup_event():
     logger.info(f"GCS Bucket: {settings.gcs_bucket}")
     logger.info(f"Project: {settings.gcp_project_id}")
     
-    # Log registered pipelines
-    from app.core.pipeline_registry import get_registry
+    # Load pipelines from YAML configuration
+    from app.core.config_loader import get_config_loader
+    from app.core.pipeline_registry import register_pipelines_from_yaml, get_registry
     from app.core.models import PipelineLayer
-    registry = get_registry()
     
-    bronze_pipelines = registry.list_pipelines(layer=PipelineLayer.BRONZE)
-    silver_pipelines = registry.list_pipelines(layer=PipelineLayer.SILVER)
-    
-    logger.info(f"Registered {len(bronze_pipelines)} bronze pipelines")
-    logger.info(f"Registered {len(silver_pipelines)} silver pipelines")
+    try:
+        config_loader = get_config_loader()
+        register_pipelines_from_yaml(config_loader)
+        
+        # Log registered pipelines
+        registry = get_registry()
+        bronze_pipelines = registry.list_pipelines(layer=PipelineLayer.BRONZE)
+        silver_pipelines = registry.list_pipelines(layer=PipelineLayer.SILVER)
+        gold_pipelines = registry.list_pipelines(layer=PipelineLayer.GOLD)
+        
+        logger.info(f"Registered {len(bronze_pipelines)} bronze pipelines")
+        logger.info(f"Registered {len(silver_pipelines)} silver pipelines")
+        logger.info(f"Registered {len(gold_pipelines)} gold pipelines")
+        
+        # Log pipeline names for debugging
+        logger.info(f"Bronze pipelines: {[p.name for p in bronze_pipelines]}")
+        logger.info(f"Silver pipelines: {[p.name for p in silver_pipelines]}")
+        
+    except Exception as e:
+        logger.error(f"Error loading pipelines from YAML: {e}", exc_info=True)
+        logger.warning("Continuing without YAML-configured pipelines")
 
 
 @app.on_event("shutdown")

@@ -1,0 +1,52 @@
+# Bronze Layer Pipeline Configuration
+# Raw data ingestion from files and APIs
+
+pipelines:
+  - name: "geo"
+    target_table: "geo"
+    source_path: "raw/geo"
+    pipeline_class: "app.pipelines.bronze.geo.BronzeGeoPipeline"
+    description: "Raw geographic/communes CSV data"
+    
+  - name: "accueillants"
+    target_table: "accueillants"
+    source_path: "raw/accueillants"
+    pipeline_class: "app.pipelines.bronze.accueillants.BronzeAccueillantsPipeline"
+    description: "Raw host organization locations data"
+    
+  - name: "logement"
+    target_table: "logement"
+    source_path: "raw/logement"
+    pipeline_class: "app.pipelines.bronze.logement.BronzeLogementPipeline"
+    description: "Raw housing prices data"
+    
+  - name: "zones_attraction"
+    target_table: "zones_attraction"
+    source_path: "raw/zones_attraction"
+    pipeline_class: "app.pipelines.bronze.zones_attraction.BronzeZonesAttractionPipeline"
+    description: "Raw urban attraction zones data"
+    
+  - name: "gares"
+    target_table: "gares"
+    source_path: "api://open_data/d22ba593-90a4-4725-977c-095d1f654d28"
+    pipeline_class: "app.pipelines.bronze.transport.BronzeGaresPipeline"
+    description: "Raw train stations data from Open Data API"
+    
+  - name: "lignes"
+    target_table: "lignes"
+    source_path: "api://open_data/2f204d3f-4274-42fb-934f-4a73954e0c4e"
+    pipeline_class: "app.pipelines.bronze.transport.BronzeLignesPipeline"
+    description: "Raw railway lines data from Open Data API"
+    
+  - name: "siae_structures"
+    target_table: "siae_structures"
+    source_path: "api://siae/structures"
+    pipeline_class: "app.pipelines.bronze.siae_structures.BronzeSIAEStructuresPipeline"
+    description: "Raw SIAE structures data from emplois.inclusion API"
+    
+  - name: "siae_postes"
+    target_table: "siae_postes"
+    source_path: "api://siae/postes"
+    pipeline_class: "app.pipelines.bronze.siae_postes.BronzeSIAEPostesPipeline"
+    description: "Raw SIAE job postings data from emplois.inclusion API"
+

@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for fact_zone_attraction - Urban attraction zones fact table (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for fact_zone_attraction - Urban attraction zones fact table (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,29 +8,35 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="zones_attraction",
-    dependencies=["bronze.zones_attraction", "silver.geo"],
+    name="fact_zone_attraction",
+    dependencies=["bronze.zones_attraction", "silver.dim_commune"],
     description_fr="Table de faits des aires d'attraction des villes 2020 avec FKs vers communes (commune et pôle) et catégories d'attraction."
 )
 class FactZoneAttractionPipeline(SQLSilverV2Pipeline):
     """Transform zones_attraction data into normalized fact_zone_attraction fact table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_fact_zone_attraction"
+        return "fact_zone_attraction"
     
     def get_target_table(self) -> str:
-        return "zones_attraction"
+        return "fact_zone_attraction"
     
     def get_sql_query(self) -> str:
-        """SQL query to transform bronze zones_attraction data with dual FK enrichment."""
+        """SQL query to transform bronze zones_attraction data with dual FK enrichment and deduplication."""
         return """
-            WITH cleaned_bronze AS (
+            WITH deduplicated_bronze AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (PARTITION BY CODGEO, AAV2020 ORDER BY ingestion_timestamp DESC) AS rn
+                FROM bronze_zones_attraction
+                WHERE AAV2020 != '000' AND CODGEO IS NOT NULL
+            ),
+            cleaned_bronze AS (
                 SELECT
                     CODGEO, LIBGEO, AAV2020,
                     REGEXP_REPLACE(LIBAAV2020, '(?i)\\\\s*\\\\(partie française\\\\)', '') AS LIBAAV2020_CLEAN,
                     CATEAAV2020, DEP, REG
-                FROM bronze_zones_attraction
-                WHERE AAV2020 != '000' AND CODGEO IS NOT NULL
+                FROM deduplicated_bronze
+                WHERE rn = 1
             ),
             name_cleaned AS (
                 SELECT
@@ -51,7 +57,7 @@ class FactZoneAttractionPipeline(SQLSilverV2Pipeline):
                     b.CATEAAV2020 AS CATEAAV,
                     b.DEP, b.REG
                 FROM name_cleaned b
-                INNER JOIN silver_geo c_pole
+                INNER JOIN silver_dim_commune c_pole
                     ON REGEXP_REPLACE(UPPER(b.LIBAAV2020), '[^A-Z0-9]', '') = 
                        REGEXP_REPLACE(UPPER(REPLACE(c_pole.commune_label, 'œ', 'oe')), '[^A-Z0-9]', '')
                 WHERE b.CODGEO NOT LIKE CONCAT('%', c_pole.commune_code, '%')
@@ -65,11 +71,11 @@ class FactZoneAttractionPipeline(SQLSilverV2Pipeline):
                 z.CATEAAV AS aire_attraction_categorie,
                 z.DEP AS departement_code,
                 z.REG AS region_code,
-                'silver_v2_fact_zone_attraction' AS job_insert_id,
+                'fact_zone_attraction' AS job_insert_id,
                 CURRENT_TIMESTAMP AS job_insert_date_utc,
-                'silver_v2_fact_zone_attraction' AS job_modify_id,
+                'fact_zone_attraction' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM with_pole_match z
-            JOIN silver_geo c1 ON z.CODGEO = c1.commune_code
-            JOIN silver_geo c2 ON z.CODGEOAAV = c2.commune_code
+            JOIN silver_dim_commune c1 ON z.CODGEO = c1.commune_code
+            JOIN silver_dim_commune c2 ON z.CODGEOAAV = c2.commune_code
         """

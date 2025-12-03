@@ -1,4 +1,4 @@
-"""SQL-based base pipeline for Silver V2 transformations using DuckDB."""
+"""SQL-based base pipeline for Silver transformations using DuckDB."""
 from app.pipelines.base_sql import SQLSilverPipeline
 from abc import abstractmethod
 import logging
@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 
 class SQLSilverV2Pipeline(SQLSilverPipeline):
     """
-    SQL-based Silver V2 pipeline using DuckDB.
+    SQL-based Silver pipeline using DuckDB.
     
-    Silver V2 enforces:
+    Silver layer enforces:
     - Surrogate keys (_sk) on all tables
     - Metadata columns (job_insert_id, job_insert_date_utc, job_modify_id, job_modify_date_utc)
     - Proper naming conventions (dim_/fact_ prefixes, lowercase, underscores)
@@ -34,9 +34,9 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
         """
         Get SQL query for transformation.
         
-        Reference bronze/silver_v2 tables, e.g.:
+        Reference bronze/silver tables, e.g.:
         - SELECT * FROM bronze_geo
-        - SELECT * FROM silver_geo
+        - SELECT * FROM silver_dim_commune
         
         Returns:
             SQL query string
@@ -44,7 +44,7 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
         pass
     
     def run(self, force: bool = False) -> dict:
-        """Override run to write to silver path (cutover from silver_v2)."""
+        """Override run to write to silver path."""
         try:
             logger.info(f"Running silver pipeline: {self.get_name()}")
             
@@ -52,7 +52,7 @@ class SQLSilverV2Pipeline(SQLSilverPipeline):
             logger.info("Transforming data")
             transformed_df = self.transform({})  # SQL pipelines don't use source_data parameter
             
-            # Write to silver table (cutover - write to production silver path)
+            # Write to silver table
             table_name = self.get_target_table()
             target_path = self.settings.get_silver_path(table_name)
             logger.info(f"Writing {len(transformed_df)} rows to {target_path}")

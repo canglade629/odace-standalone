@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for fact_logement - Housing prices fact table (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for fact_logement - Housing prices fact table (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,18 +8,18 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="logement",
-    dependencies=["bronze.logement", "silver.geo"],
-    description_fr="Table de faits des prix du logement par commune. Contient les loyers prédits, bornes d'intervalles et niveaux de qualité (normalisée sans duplication géographique)."
+    name="fact_logement",
+    dependencies=["bronze.logement", "silver.dim_commune"],
+    description_fr="Table de faits des loyers prédits au m² par commune avec bornes de prédiction et niveau de qualité. FK vers dim_commune."
 )
 class FactLogementPipeline(SQLSilverV2Pipeline):
     """Transform logement data into normalized fact_logement fact table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_fact_logement"
+        return "fact_logement"
     
     def get_target_table(self) -> str:
-        return "logement"
+        return "fact_logement"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze logement data - FULLY NORMALIZED (no lib_* columns)."""
@@ -58,12 +58,12 @@ class FactLogementPipeline(SQLSilverV2Pipeline):
                 '' AS data_rescued,
                 SUBSTRING(l.code_commune, 1, 2) AS code_departement,
                 COALESCE(CAST(l.REG AS VARCHAR), '') AS code_region,
-                'silver_v2_fact_logement' AS job_insert_id,
+                'fact_logement' AS job_insert_id,
                 CURRENT_TIMESTAMP AS job_insert_date_utc,
-                'silver_v2_fact_logement' AS job_modify_id,
+                'fact_logement' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM with_row_number l
-            JOIN silver_geo c ON l.code_commune = c.commune_code
+            JOIN silver_dim_commune c ON l.code_commune = c.commune_code
             WHERE rn = 1
               AND l.loypredm2_clean IS NOT NULL
               AND l.loypredm2_clean > 0

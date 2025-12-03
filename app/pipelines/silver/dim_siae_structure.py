@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for dim_siae_structure - SIAE structures dimension (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for dim_siae_structure - SIAE structures dimension (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,18 +8,18 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="siae_structures",
-    dependencies=["bronze.siae_structures", "bronze.geo", "silver.geo"],
-    description_fr="Table de dimension des structures d'insertion par l'activité économique (SIAE) avec informations légales et enrichissement géographique."
+    name="dim_siae_structure",
+    dependencies=["bronze.siae_structures", "bronze.geo", "silver.dim_commune"],
+    description_fr="Table de dimension des structures d'insertion par l'activité économique (SIAE) avec enrichissement géographique (FK vers dim_commune) et informations de contact."
 )
 class DimSIAEStructurePipeline(SQLSilverV2Pipeline):
     """Transform SIAE structures data into normalized dim_siae_structure dimension table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_siae_structures"
+        return "dim_siae_structure"
     
     def get_target_table(self) -> str:
-        return "siae_structures"
+        return "dim_siae_structure"
     
     def get_sql_query(self) -> str:
         """SQL query to transform bronze SIAE structures data with geographic enrichment."""
@@ -33,7 +33,7 @@ class DimSIAEStructurePipeline(SQLSilverV2Pipeline):
             with_commune_sk AS (
                 SELECT s.*, c.commune_sk
                 FROM geo_enriched s
-                LEFT JOIN silver_geo c ON s.code_insee = c.commune_code
+                LEFT JOIN silver_dim_commune c ON s.code_insee = c.commune_code
             ),
             deduplicated AS (
                 SELECT *,

@@ -19,6 +19,7 @@ class JobStatus(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"
+    CANCELLED = "cancelled"
 
 
 class TaskStatus(str, Enum):
@@ -27,6 +28,7 @@ class TaskStatus(str, Enum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Task:

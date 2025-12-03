@@ -88,7 +88,7 @@ class SQLSilverPipeline(BaseSilverPipeline):
         """
         Extract table references from SQL query.
         
-        Looks for patterns like bronze_geo, silver_geo, silver_v2_dim_commune, etc.
+        Looks for patterns like bronze_geo, silver_dim_commune, etc.
         
         Args:
             sql: SQL query string
@@ -100,8 +100,8 @@ class SQLSilverPipeline(BaseSilverPipeline):
         
         paths = {}
         
-        # Pattern to find table references like bronze_<name>, silver_<name>, or silver_v2_<name>
-        pattern = r'\b(bronze|silver(?:_v2)?)_((?:dim_|fact_)?\w+)\b'
+        # Pattern to find table references like bronze_<name>, silver_<name>
+        pattern = r'\b(bronze|silver|gold)_((?:dim_|fact_)?\w+)\b'
         
         # Find all unique matches
         matches = set(re.findall(pattern, sql, re.IGNORECASE))
@@ -113,10 +113,10 @@ class SQLSilverPipeline(BaseSilverPipeline):
             # Generate the GCS path
             if layer_lower == "bronze":
                 path = self.settings.get_bronze_path(table_name)
-            elif layer_lower == "silver_v2":
-                path = self.settings.get_silver_v2_path(table_name)
-            else:  # silver
+            elif layer_lower == "silver":
                 path = self.settings.get_silver_path(table_name)
+            else:  # gold
+                path = self.settings.get_gold_path(table_name)
             
             paths[table_alias] = path
             logger.debug(f"Extracted table reference: {table_alias} -> {path}")
@@ -164,7 +164,7 @@ class SQLSilverPipeline(BaseSilverPipeline):
                 loaded_tables[alias] = df
                 logger.info(f"Loaded {len(df)} rows from {alias}")
             except Exception as e:
-                # If table doesn't exist (e.g., silver_v2 table being created), skip it
+                # If table doesn't exist (e.g., silver table being created), skip it
                 if "no log files" in str(e) or "not found" in str(e).lower():
                     logger.warning(f"Table {alias} does not exist yet, skipping (this is OK for initial load)")
                     continue

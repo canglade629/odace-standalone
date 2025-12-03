@@ -13,7 +13,6 @@ class PipelineRegistry:
         self._pipelines: Dict[str, Dict[str, Type]] = {
             "bronze": {},
             "silver": {},
-            "silver_v2": {},
             "gold": {}
         }
         self._dependencies: Dict[str, List[str]] = {}
@@ -143,4 +142,41 @@ def register_pipeline(layer: str, name: str, dependencies: Optional[List[str]] =
         _registry.register(layer, name, cls, dependencies, description_fr)
         return cls
     return decorator
+
+
+def register_pipelines_from_yaml(config_loader):
+    """
+    Register pipelines from YAML configuration files.
+    
+    Args:
+        config_loader: ConfigLoader instance with pipeline configurations
+    """
+    logger.info("Loading pipelines from YAML configuration")
+    
+    configs = config_loader.load_all_configs()
+    
+    # Validate dependencies
+    if not config_loader.validate_dependencies(configs):
+        logger.warning("Some pipeline dependencies are invalid")
+    
+    # Register pipelines from all layers
+    for layer, pipeline_configs in configs.items():
+        for config in pipeline_configs:
+            try:
+                # Import the pipeline class
+                pipeline_class = config_loader.get_pipeline_class(config.pipeline_class)
+                
+                # Register it
+                _registry.register(
+                    layer=layer,
+                    name=config.name,
+                    pipeline_class=pipeline_class,
+                    dependencies=config.dependencies,
+                    description_fr=config.description_fr
+                )
+                
+                logger.info(f"Registered {layer}.{config.name} from YAML config")
+                
+            except Exception as e:
+                logger.error(f"Failed to register pipeline {layer}.{config.name}: {e}", exc_info=True)
 

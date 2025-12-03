@@ -187,6 +187,16 @@ button, .btn {
     font-size: 0.9rem;
 }
 
+.btn-danger {
+    background: var(--error);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d32f2f;
+    box-shadow: var(--shadow-md);
+}
+
 /* Pipeline Sections */
 .pipeline-section {
     background: var(--bg-secondary);
@@ -345,6 +355,11 @@ button, .btn {
     color: var(--warning);
 }
 
+.badge-cancelled {
+    background: #e0e0e0;
+    color: #616161;
+}
+
 /* File Management */
 .file-section {
     background: var(--bg-secondary);
@@ -497,6 +512,12 @@ button, .btn {
 .job-user {
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.job-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
 
 .view-details-btn {

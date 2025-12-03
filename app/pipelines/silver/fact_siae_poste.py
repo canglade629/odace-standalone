@@ -1,5 +1,5 @@
-"""Silver V2 pipeline for fact_siae_poste - SIAE job positions fact table (SQL-based)."""
-from app.pipelines.silver_v2.base_v2 import SQLSilverV2Pipeline
+"""Silver pipeline for fact_siae_poste - SIAE job positions fact table (SQL-based)."""
+from app.pipelines.silver.base_v2 import SQLSilverV2Pipeline
 from app.core.pipeline_registry import register_pipeline
 import logging
 
@@ -8,21 +8,21 @@ logger = logging.getLogger(__name__)
 
 @register_pipeline(
     layer="silver",
-    name="siae_postes",
-    dependencies=["bronze.siae_postes", "silver.siae_structures"],
-    description_fr="Table de faits des postes/offres d'emploi dans les SIAE avec types de contrats, codes ROME et disponibilité (normalisée avec FK vers structures)."
+    name="fact_siae_poste",
+    dependencies=["bronze.siae_postes", "silver.dim_siae_structure"],
+    description_fr="Table de faits des postes ouverts en SIAE avec codes ROME, types de contrats et disponibilité. FK vers dim_siae_structure."
 )
 class FactSIAEPostePipeline(SQLSilverV2Pipeline):
     """Transform SIAE postes data into normalized fact_siae_poste fact table using SQL."""
     
     def get_name(self) -> str:
-        return "silver_fact_siae_poste"
+        return "fact_siae_poste"
     
     def get_target_table(self) -> str:
-        return "siae_postes"
+        return "fact_siae_poste"
     
     def get_sql_query(self) -> str:
-        """SQL query to transform bronze SIAE postes data with structure FK."""
+        """SQL query to transform bronze SIAE postes data with structure FK and deduplication."""
         return """
             WITH postes_with_rome AS (
                 SELECT 
@@ -32,6 +32,14 @@ class FactSIAEPostePipeline(SQLSilverV2Pipeline):
                 FROM bronze_siae_postes p
                 WHERE p.rome IS NOT NULL 
                   AND p.rome LIKE '%(%)%'
+            ),
+            deduplicated AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY id, structure_id 
+                        ORDER BY mis_a_jour_le DESC, ingestion_timestamp DESC
+                    ) AS rn
+                FROM postes_with_rome
             )
             SELECT 
                 MD5(CONCAT(CAST(p.id AS VARCHAR), CAST(p.structure_id AS VARCHAR))) AS siae_poste_sk,
@@ -50,11 +58,11 @@ class FactSIAEPostePipeline(SQLSilverV2Pipeline):
                 COALESCE(CAST(p.nombre_postes_ouverts AS INTEGER), 0) AS postes_nombre,
                 CAST(p.cree_le AS TIMESTAMP) AS creation_date_utc,
                 CAST(p.mis_a_jour_le AS TIMESTAMP) AS modification_date_utc,
-                'silver_v2_fact_siae_poste' AS job_insert_id,
+                'fact_siae_poste' AS job_insert_id,
                 CURRENT_TIMESTAMP AS job_insert_date_utc,
-                'silver_v2_fact_siae_poste' AS job_modify_id,
+                'fact_siae_poste' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
-            FROM postes_with_rome p
-            LEFT JOIN silver_siae_structures s ON CAST(p.structure_id AS VARCHAR) = CAST(s.id AS VARCHAR)
-            WHERE p.rome_code_extracted IS NOT NULL
+            FROM deduplicated p
+            LEFT JOIN silver_dim_siae_structure s ON CAST(p.structure_id AS VARCHAR) = CAST(s.id AS VARCHAR)
+            WHERE p.rn = 1 AND p.rome_code_extracted IS NOT NULL
         """

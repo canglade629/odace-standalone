@@ -93,35 +93,21 @@
         <div id="logs" class="tab-content">
             <div class="logs-header">
                 <h2>Pipeline Logs</h2>
-                <div class="logs-controls">
-                    <div class="control-group-inline">
-                        <label for="logJobSelector">Job:</label>
-                        <select id="logJobSelector" onchange="onLogJobChange()">
-                            <option value="">Select a job...</option>
-                        </select>
-                    </div>
-                    <div class="control-group-inline">
-                        <label for="logTaskFilter">Task:</label>
-                        <select id="logTaskFilter" onchange="loadSelectedJobLogs()">
-                            <option value="">All tasks</option>
-                        </select>
-                    </div>
-                    <div class="logs-actions">
-                        <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="btn btn-small btn-secondary">
-                            <span id="autoRefreshIcon">▶</span> Auto-refresh
-                        </button>
-                        <button onclick="clearLogsDisplay()" class="btn btn-small btn-secondary">Clear</button>
-                        <button onclick="loadSelectedJobLogs()" class="btn-icon" title="Refresh logs">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                            </svg>
-                        </button>
-                    </div>
+                <div class="logs-actions">
+                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="btn btn-small btn-secondary">
+                        <span id="autoRefreshIcon">▶</span> Auto-refresh
+                    </button>
+                    <button onclick="clearLogsDisplay()" class="btn btn-small btn-secondary">Clear</button>
+                    <button onclick="loadAllLogs()" class="btn-icon" title="Refresh logs">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
             <div class="terminal-container">
                 <div id="terminal-output" class="terminal-output">
-                    <div class="terminal-prompt">Select a job to view logs...</div>
+                    <div class="terminal-prompt">Loading logs...</div>
                 </div>
             </div>
         </div>
@@ -503,6 +489,19 @@
             // Format user display (show email or "System" if no user)
             const userDisplay = job.user_id ? job.user_id : 'System';
             
+            // Create stop button HTML if job is running
+            const shouldShowStop = (job.status === 'running' || job.status === 'pending');
+            console.log(`Job ${job.job_id}: status=${job.status}, shouldShowStop=${shouldShowStop}`);
+            
+            const stopButtonHtml = shouldShowStop
+                ? `<button class="btn btn-small btn-danger" onclick="stopJob('${job.job_id}', event)" title="Stop this job">
+                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                       </svg>
+                       Stop
+                   </button>`
+                : '';
+            
             jobItem.innerHTML = `
                 <div class="job-header">
                     <div class="job-main-info">
@@ -516,7 +515,10 @@
                             <span class="job-tasks">${job.completed_tasks}/${job.total_tasks} tasks</span>
                         </div>
                     </div>
-                    <button class="btn btn-small view-details-btn" onclick="openJobModal('${job.job_id}')">View Details</button>
+                    <div class="job-actions">
+                        ${stopButtonHtml}
+                        <button class="btn btn-small view-details-btn" onclick="openJobModal('${job.job_id}')">View Details</button>
+                    </div>
                 </div>
             `;
             
@@ -689,9 +691,42 @@
                 'failed': 'failed',
                 'running': 'running',
                 'pending': 'pending',
-                'partial': 'warning'
+                'partial': 'warning',
+                'cancelled': 'cancelled'
             };
             return statusMap[status] || 'pending';
+        }
+
+        async function stopJob(jobId, event) {
+            // Stop event propagation to prevent opening the modal
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            if (!confirm('Are you sure you want to stop this job? Running tasks will be cancelled.')) {
+                return;
+            }
+            
+            try {
+                showStatus('Stopping job...', 'info');
+                
+                const response = await fetch(`${API_BASE}/api/jobs/${jobId}/cancel`, {
+                    method: 'POST',
+                    headers: getHeaders()
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Job stopped successfully', 'success');
+                    // Refresh the job history to show updated status
+                    loadJobHistory();
+                } else {
+                    showStatus('Failed to stop job: ' + data.detail, 'error');
+                }
+            } catch (error) {
+                showStatus('Error stopping job: ' + error.message, 'error');
+            }
         }
 
         function startJobHistoryRefresh() {
@@ -1579,97 +1614,23 @@
 
         // Logs Tab Functions
         let logsAutoRefreshInterval = null;
-        let currentLogJobId = null;
         let isAutoRefreshEnabled = false;
 
         async function loadLogsTab() {
-            try {
-                // Load job list for selector
-                const response = await fetch(`${API_BASE}/api/jobs?limit=50`, {
-                    headers: getHeaders()
-                });
-                const data = await response.json();
-                
-                const selector = document.getElementById('logJobSelector');
-                
-                // Clear existing options except first
-                selector.innerHTML = '<option value="">Select a job...</option>';
-                
-                // Add jobs to selector
-                data.jobs.forEach(job => {
-                    const option = document.createElement('option');
-                    option.value = job.job_id;
-                    option.textContent = `${job.job_name} - ${formatDate(job.started_at)} (${job.status})`;
-                    selector.appendChild(option);
-                });
-                
-            } catch (error) {
-                showStatus('Error loading jobs: ' + error.message, 'error');
+            // Load all logs immediately
+            await loadAllLogs();
+            
+            // Enable auto-refresh by default
+            if (!isAutoRefreshEnabled) {
+                toggleAutoRefresh();
             }
         }
 
-        function onLogJobChange() {
-            const selector = document.getElementById('logJobSelector');
-            const jobId = selector.value;
-            
-            if (!jobId) {
-                clearLogsDisplay();
-                return;
-            }
-            
-            currentLogJobId = jobId;
-            
-            // Load tasks for this job to populate task filter
-            loadTasksForLogFilter(jobId);
-            
-            // Load logs
-            loadSelectedJobLogs();
-        }
-
-        async function loadTasksForLogFilter(jobId) {
-            try {
-                const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
-                    headers: getHeaders()
-                });
-                const jobData = await response.json();
-                
-                const taskFilter = document.getElementById('logTaskFilter');
-                taskFilter.innerHTML = '<option value="">All tasks</option>';
-                
-                if (jobData.tasks && jobData.tasks.length > 0) {
-                    jobData.tasks.forEach(task => {
-                        const option = document.createElement('option');
-                        option.value = task.task_id;
-                        option.textContent = `${task.layer}.${task.pipeline_name}`;
-                        taskFilter.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading tasks:', error);
-            }
-        }
-
-        async function loadSelectedJobLogs() {
-            const jobId = currentLogJobId;
-            if (!jobId) return;
-            
-            const taskFilter = document.getElementById('logTaskFilter');
-            const taskId = taskFilter.value;
-            
-            await loadJobLogs(jobId, taskId);
-        }
-
-        async function loadJobLogs(jobId, taskId = null) {
+        async function loadAllLogs() {
             const terminalOutput = document.getElementById('terminal-output');
             
             try {
-                // Build query params
-                let url = `${API_BASE}/api/jobs/${jobId}/logs?limit=1000`;
-                if (taskId) {
-                    url += `&task_id=${taskId}`;
-                }
-                
-                const response = await fetch(url, {
+                const response = await fetch(`${API_BASE}/api/jobs/logs/stream?limit=500`, {
                     headers: getHeaders()
                 });
                 
@@ -1682,30 +1643,9 @@
                 // Render logs
                 renderLogs(data.logs);
                 
-                // Check if job is still running - enable auto-refresh if so
-                const jobResponse = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
-                    headers: getHeaders()
-                });
-                const jobData = await jobResponse.json();
-                
-                if (jobData.status === 'running' || jobData.status === 'pending') {
-                    if (!isAutoRefreshEnabled) {
-                        // Suggest enabling auto-refresh for running jobs
-                        const btn = document.getElementById('autoRefreshBtn');
-                        if (btn && !btn.classList.contains('active')) {
-                            // Could auto-enable here, but let's keep it manual
-                        }
-                    }
-                } else {
-                    // Job completed, stop auto-refresh
-                    if (isAutoRefreshEnabled) {
-                        toggleAutoRefresh();
-                    }
-                }
-                
             } catch (error) {
                 terminalOutput.innerHTML = `<div class="terminal-prompt" style="color: #f48771;">Error loading logs: ${error.message}</div>`;
-                showStatus('Error loading logs: ' + error.message, 'error');
+                console.error('Error loading logs:', error);
             }
         }
 
@@ -1713,7 +1653,7 @@
             const terminalOutput = document.getElementById('terminal-output');
             
             if (!logs || logs.length === 0) {
-                terminalOutput.innerHTML = '<div class="logs-empty">No logs available for this job.</div>';
+                terminalOutput.innerHTML = '<div class="logs-empty">No logs available yet. Run a pipeline to see logs here.</div>';
                 return;
             }
             
@@ -1755,17 +1695,7 @@
 
         function clearLogsDisplay() {
             const terminalOutput = document.getElementById('terminal-output');
-            terminalOutput.innerHTML = '<div class="terminal-prompt">Select a job to view logs...</div>';
-            
-            const taskFilter = document.getElementById('logTaskFilter');
-            taskFilter.innerHTML = '<option value="">All tasks</option>';
-            
-            currentLogJobId = null;
-            
-            // Stop auto-refresh if active
-            if (isAutoRefreshEnabled) {
-                toggleAutoRefresh();
-            }
+            terminalOutput.innerHTML = '<div class="terminal-prompt">Logs cleared. Auto-refresh will populate new logs...</div>';
         }
 
         function toggleAutoRefresh() {
@@ -1781,9 +1711,7 @@
                 // Start auto-refresh
                 if (!logsAutoRefreshInterval) {
                     logsAutoRefreshInterval = setInterval(() => {
-                        if (currentLogJobId) {
-                            loadSelectedJobLogs();
-                        }
+                        loadAllLogs();
                     }, 3000); // Refresh every 3 seconds
                 }
                 
