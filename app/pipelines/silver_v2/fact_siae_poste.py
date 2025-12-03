@@ -34,7 +34,7 @@ class FactSIAEPostePipeline(SQLSilverV2Pipeline):
                   AND p.rome LIKE '%(%)%'
             )
             SELECT 
-                MD5(CONCAT(CAST(p.id AS VARCHAR), CAST(p.structure_id AS VARCHAR), COALESCE(p.rome_code_extracted, ''))) AS siae_poste_sk,
+                MD5(CONCAT(CAST(p.id AS VARCHAR), CAST(p.structure_id AS VARCHAR))) AS siae_poste_sk,
                 COALESCE(s.siae_structure_sk, '') AS siae_structure_sk,
                 CAST(p.id AS VARCHAR) AS poste_id,
                 CAST(p.structure_id AS VARCHAR) AS structure_id,

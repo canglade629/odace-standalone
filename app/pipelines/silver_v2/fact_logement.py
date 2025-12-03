@@ -48,7 +48,7 @@ class FactLogementPipeline(SQLSilverV2Pipeline):
                 FROM with_code_commune
             )
             SELECT
-                MD5(CONCAT(l.code_commune, CAST(l.loypredm2_clean AS VARCHAR))) AS logement_sk,
+                MD5(l.code_commune) AS logement_sk,
                 c.commune_sk AS commune_sk,
                 COALESCE(CAST(l.EPCI AS VARCHAR), '') AS epci_code,
                 CAST(l.loypredm2_clean AS DECIMAL(10,2)) AS loyer_predicted_m2,

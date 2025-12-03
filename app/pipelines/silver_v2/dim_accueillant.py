@@ -36,21 +36,26 @@ class DimAccueillantPipeline(SQLSilverV2Pipeline):
                   AND Latitude BETWEEN -90 AND 90
                   AND Longitude BETWEEN -180 AND 180
             ),
-            with_commune AS (
+            deduplicated AS (
                 SELECT 
                     a.*,
-                    c.commune_sk,
                     ROW_NUMBER() OVER (
-                        PARTITION BY a.ville, a.code_postal, a.latitude, a.longitude 
-                        ORDER BY CASE WHEN c.commune_sk IS NOT NULL THEN 0 ELSE 1 END,
-                                 a.statut
+                        PARTITION BY latitude, longitude, statut, code_postal, UPPER(TRIM(ville))
+                        ORDER BY ville
                     ) AS rn
                 FROM accueillants_clean a
+            ),
+            with_commune AS (
+                SELECT 
+                    d.*,
+                    c.commune_sk
+                FROM deduplicated d
                 LEFT JOIN silver_geo c
-                    ON SUBSTRING(a.code_postal, 1, 5) = c.commune_code
+                    ON SUBSTRING(d.code_postal, 1, 5) = c.commune_code
+                WHERE rn = 1
             )
             SELECT 
-                MD5(CONCAT(ville, COALESCE(code_postal, ''), CAST(latitude AS VARCHAR), CAST(longitude AS VARCHAR))) AS accueillant_sk,
+                MD5(CONCAT(CAST(latitude AS VARCHAR), CAST(longitude AS VARCHAR), statut, COALESCE(code_postal, ''), UPPER(ville))) AS accueillant_sk,
                 commune_sk,
                 statut,
                 ville,
@@ -62,5 +67,4 @@ class DimAccueillantPipeline(SQLSilverV2Pipeline):
                 'silver_v2_dim_accueillant' AS job_modify_id,
                 CURRENT_TIMESTAMP AS job_modify_date_utc
             FROM with_commune
-            WHERE rn = 1
         """
